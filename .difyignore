@@ -1,0 +1,12 @@
+.env
+.env.example
+.git/
+.gitignore
+.github/
+.difyignore
+.pytest_cache/
+.venv/
+__pycache__/
+tests/
+*.difypkg
+pyproject.toml

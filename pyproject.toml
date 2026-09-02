@@ -1,0 +1,14 @@
+[project]
+name = "dify-flowspeech-provider"
+version = "0.1.0"
+description = "FlowSpeech text-to-speech tool plugin for Dify"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "dify_plugin>=0.10.0,<0.11.0",
+  "requests>=2.32.0,<3.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

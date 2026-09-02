@@ -1,0 +1,30 @@
+identity:
+  author: flowspeech
+  name: flowspeech
+  label:
+    en_US: FlowSpeech
+    zh_Hans: FlowSpeech
+  description:
+    en_US: Generate context-aware text-to-speech audio with FlowSpeech.
+    zh_Hans: 使用 FlowSpeech 生成支持上下文理解的文本转语音音频。
+  icon: icon.png
+credentials_for_provider:
+  api_key:
+    type: secret-input
+    required: true
+    label:
+      en_US: API Key
+      zh_Hans: API 密钥
+    placeholder:
+      en_US: Enter your FlowSpeech API key
+      zh_Hans: 输入 FlowSpeech API 密钥
+    help:
+      en_US: Create an API key in your FlowSpeech account.
+      zh_Hans: 在 FlowSpeech 账户中创建 API 密钥。
+    url: https://flowspeech.io/
+tools:
+  - tools/text_to_speech.yaml
+extra:
+  python:
+    source: provider/flowspeech.py
+

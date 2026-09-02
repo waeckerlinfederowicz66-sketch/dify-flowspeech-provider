@@ -1,0 +1,99 @@
+identity:
+  name: flowspeech_text_to_speech
+  author: flowspeech
+  label:
+    en_US: Generate speech with FlowSpeech
+    zh_Hans: 使用 FlowSpeech 生成语音
+description:
+  human:
+    en_US: Convert text into context-aware speech audio with a selected FlowSpeech voice.
+    zh_Hans: 使用指定的 FlowSpeech 音色将文本转换为支持上下文理解的语音。
+  llm: Convert text to speech audio with FlowSpeech. Returns an audio file for downstream workflow nodes.
+parameters:
+  - name: text
+    type: string
+    required: true
+    label:
+      en_US: Text
+      zh_Hans: 文本
+    human_description:
+      en_US: Text to convert into speech. Plain-language emotion cues and pause tags are supported.
+      zh_Hans: 要转换为语音的文本，支持自然语言情绪提示和停顿标签。
+    llm_description: The complete text to synthesize as speech.
+    form: llm
+  - name: voice_name
+    type: select
+    required: true
+    default: Kore
+    label:
+      en_US: Voice
+      zh_Hans: 音色
+    human_description:
+      en_US: FlowSpeech voice used for synthesis.
+      zh_Hans: 用于语音合成的 FlowSpeech 音色。
+    form: form
+    options:
+      - value: Kore
+        label: { en_US: Kore - firm and focused, zh_Hans: Kore - 坚定专注 }
+      - value: Puck
+        label: { en_US: Puck - upbeat and playful, zh_Hans: Puck - 活泼轻快 }
+      - value: Charon
+        label: { en_US: Charon - informative narration, zh_Hans: Charon - 信息型旁白 }
+      - value: Aoede
+        label: { en_US: Aoede - breezy and light, zh_Hans: Aoede - 轻盈自然 }
+      - value: Fenrir
+        label: { en_US: Fenrir - energetic, zh_Hans: Fenrir - 充满活力 }
+      - value: Zephyr
+        label: { en_US: Zephyr - bright and cheerful, zh_Hans: Zephyr - 明亮愉快 }
+      - value: Autonoe
+        label: { en_US: Autonoe - bright and welcoming, zh_Hans: Autonoe - 明快亲切 }
+      - value: Laomedeia
+        label: { en_US: Laomedeia - upbeat and lively, zh_Hans: Laomedeia - 轻快生动 }
+      - value: Sadachbia
+        label: { en_US: Sadachbia - lively and colorful, zh_Hans: Sadachbia - 生动多彩 }
+      - value: Leda
+        label: { en_US: Leda - youthful and casual, zh_Hans: Leda - 年轻随和 }
+      - value: Rasalgethi
+        label: { en_US: Rasalgethi - educational, zh_Hans: Rasalgethi - 教育讲解 }
+      - value: Orus
+        label: { en_US: Orus - firm and decisive, zh_Hans: Orus - 坚定果断 }
+      - value: Alnilam
+        label: { en_US: Alnilam - authoritative, zh_Hans: Alnilam - 权威沉稳 }
+      - value: Erinome
+        label: { en_US: Erinome - clear and precise, zh_Hans: Erinome - 清晰准确 }
+      - value: Iapetus
+        label: { en_US: Iapetus - professional, zh_Hans: Iapetus - 专业清晰 }
+      - value: Schedar
+        label: { en_US: Schedar - even and steady, zh_Hans: Schedar - 平稳均衡 }
+      - value: Pulcherrima
+        label: { en_US: Pulcherrima - forward and direct, zh_Hans: Pulcherrima - 直接明快 }
+      - value: Sadaltager
+        label: { en_US: Sadaltager - knowledgeable, zh_Hans: Sadaltager - 知识型表达 }
+      - value: Umbriel
+        label: { en_US: Umbriel - easy-going, zh_Hans: Umbriel - 轻松随和 }
+      - value: Callirrhoe
+        label: { en_US: Callirrhoe - soothing, zh_Hans: Callirrhoe - 舒缓自然 }
+      - value: Achird
+        label: { en_US: Achird - friendly and helpful, zh_Hans: Achird - 友好亲切 }
+      - value: Zubenelgenubi
+        label: { en_US: Zubenelgenubi - laid-back, zh_Hans: Zubenelgenubi - 休闲松弛 }
+      - value: Algieba
+        label: { en_US: Algieba - smooth and mellow, zh_Hans: Algieba - 平滑柔和 }
+      - value: Despina
+        label: { en_US: Despina - reassuring, zh_Hans: Despina - 温和安心 }
+      - value: Enceladus
+        label: { en_US: Enceladus - breathy and magnetic, zh_Hans: Enceladus - 气声磁性 }
+      - value: Algenib
+        label: { en_US: Algenib - gravelly and textured, zh_Hans: Algenib - 沙哑有质感 }
+      - value: Sulafat
+        label: { en_US: Sulafat - warm and inviting, zh_Hans: Sulafat - 温暖亲和 }
+      - value: Vindemiatrix
+        label: { en_US: Vindemiatrix - gentle and caring, zh_Hans: Vindemiatrix - 温柔关怀 }
+      - value: Achernar
+        label: { en_US: Achernar - soft and tender, zh_Hans: Achernar - 柔和细腻 }
+      - value: Gacrux
+        label: { en_US: Gacrux - mature and experienced, zh_Hans: Gacrux - 成熟稳重 }
+extra:
+  python:
+    source: tools/text_to_speech.py
+
