@@ -40,6 +40,12 @@ class FlowSpeechClient:
         self._base_url = base_url.rstrip("/")
         self._session = session or requests.Session()
         self._timeout = timeout
+        self._headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "dify-flowspeech-provider/0.1.0",
+        }
 
     def check_quota(self) -> dict[str, Any]:
         response = self._session.get(
@@ -96,15 +102,6 @@ class FlowSpeechClient:
 
         return FlowSpeechAudio(content=audio, mime_type=mime_type)
 
-    @property
-    def _headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self._api_key}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "User-Agent": "dify-flowspeech-provider/0.1.0",
-        }
-
     @staticmethod
     def _read_response(response: requests.Response) -> dict[str, Any]:
         try:
@@ -152,4 +149,3 @@ class FlowSpeechClient:
             wav_file.setframerate(sample_rate)
             wav_file.writeframes(audio)
         return output.getvalue()
-
