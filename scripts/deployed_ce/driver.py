@@ -172,6 +172,7 @@ def install(console: Console, state: Path) -> dict:
 
 def run_case(console, case, *, delay, timeout, expect_audio, minimum=0, maximum=420):
     console.current_case = case
+    console.current_audit = None
     console.control("/configure", {"case": case, "delay": delay})
     request_id = str(uuid.uuid4())
     app = console.json("/apps", method="POST", body={"name": "FlowSpeech CE " + case, "mode": "workflow"})
@@ -188,20 +189,26 @@ def run_case(console, case, *, delay, timeout, expect_audio, minimum=0, maximum=
     assert console.fixture["api_key"] not in json.dumps(outputs), "Credential leaked to workflow output"
     files = outputs.get("audio") or []
     audit = console.control("/audit")
+    console.current_audit = audit
     calls = audit["calls"]
     creates = [c for c in calls if c["method"] == "POST"]
     assert len(creates) == 1 and creates[0]["path"] == "/api/v1/tts/jobs"
     assert creates[0]["request_id"] == request_id
-    assert all(c["path"] != "/redirect-target" for c in calls), "A redirect was followed"
+    assert all(c["path"] != "/redirect-target" for c in calls), "A forbidden redirect was followed"
     polls = [c for c in calls if c["path"].startswith("/api/v1/tts/jobs/")]
     if polls:
         assert polls[0]["elapsed"] - creates[0]["elapsed"] >= 4.8
         assert all(b["elapsed"] - a["elapsed"] >= 4.8 for a, b in zip(polls, polls[1:]))
-    downloads = [c for c in calls if c["host"] == "static.flowspeech.io"]
+    downloads = [c for c in calls if c["host"] == "static.flowspeech.io" or c["path"] == "/audio/redirected.wav"]
     assert all(not c["authorization_present"] and not c["cookie_present"] for c in downloads)
     job_id = next(iter(audit["jobs"]), None)
+    persisted_audio_sha256 = None
     if expect_audio:
-        assert len(files) == 1 and len(downloads) == 1
+        assert len(files) == 1 and len(downloads) == (2 if case == "audio-redirect-safe" else 1)
+        if case == "audio-redirect-safe":
+            assert [(c["host"], c["path"]) for c in downloads] == [
+                ("static.flowspeech.io", "/audio/" + job_id + ".wav"),
+                ("flowspeech.io", "/audio/redirected.wav")]
         metadata = json.dumps(outputs.get("metadata"))
         assert request_id in metadata and job_id in metadata
         # Download only from CE's file service, not from the mock storage directly.
@@ -209,6 +216,7 @@ def run_case(console, case, *, delay, timeout, expect_audio, minimum=0, maximum=
         with console.opener.open(url, timeout=15) as response:
             audio = response.read(1024 * 1024)
         assert audio == fixture_wav(), "CE's persisted WAV differs from the plugin's fixture output"
+        persisted_audio_sha256 = hashlib.sha256(audio).hexdigest()
         with wave.open(io.BytesIO(audio), "rb") as wav:
             assert (wav.getframerate(), wav.getnchannels(), wav.getsampwidth()) == (24000, 1, 2)
     else:
@@ -218,7 +226,8 @@ def run_case(console, case, *, delay, timeout, expect_audio, minimum=0, maximum=
             assert job_id in outputs["message"]
     return {"case": case, "workflow_status": final["status"], "elapsed_seconds": round(elapsed, 3),
             "request_id": request_id, "job_id": job_id, "creates": len(creates), "polls": len(polls),
-            "downloads": len(downloads), "audio_files": len(files), "audit": calls}
+            "downloads": len(downloads), "audio_files": len(files),
+            "persisted_audio_sha256": persisted_audio_sha256, "audit": calls}
 
 
 def run(console, *, short_host=False, progress=None):
@@ -262,6 +271,7 @@ def run(console, *, short_host=False, progress=None):
         ("malformed", 1, 300, False, 0, 60),
         ("api-redirect", 1, 300, False, 0, 30),
         ("audio-redirect", 1, 300, False, 0, 60),
+        ("audio-redirect-safe", 1, 300, True, 4.8, 60),
         ("deadline", 200, 10, False, 4, 15),
     ]:
         results.append(run_case(console, case, delay=delay, timeout=timeout, expect_audio=expect,
@@ -292,6 +302,8 @@ def main():
         result["error_type"] = type(error).__name__
         result["error_message"] = redact(str(error), list(fixture.values()))[:2000]
         result["current_case"] = getattr(console, "current_case", None)
+        if getattr(console, "current_audit", None) is not None:
+            result["failed_case_audit"] = console.current_audit
         if isinstance(error, HTTPError):
             result["http_status"] = error.code
             result["route"] = urlsplit(error.url).path

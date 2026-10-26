@@ -32,7 +32,7 @@ class State:
         self.case, self.delay = "basic", 1.0
 
     def configure(self, case: str, delay: float):
-        if case not in {"basic", "slow", "malformed", "deadline", "api-redirect", "audio-redirect"}:
+        if case not in {"basic", "slow", "malformed", "deadline", "api-redirect", "audio-redirect", "audio-redirect-safe"}:
             raise ValueError("Unknown fixture case")
         if not 0 <= delay <= 240:
             raise ValueError("Fixture delay outside bounded gate")
@@ -49,13 +49,21 @@ class State:
                 "body_sha256": hashlib.sha256(body).hexdigest()}
         self.calls.append(call)
         error = lambda status, code: (status, {}, {"error": {"code": code, "message": code, "retryable": False}})
+        if host == "flowspeech.io" and path == "/audio/redirected.wav":
+            if call["authorization_present"] or call["cookie_present"]:
+                return error(403, "FIXTURE_CREDENTIAL_LEAK")
+            if self.case != "audio-redirect-safe" or method != "GET":
+                return error(404, "FIXTURE_UNEXPECTED_DOWNLOAD")
+            return 200, {"Content-Type": "audio/wav"}, fixture_wav()
         if host == "static.flowspeech.io":
             if call["authorization_present"] or call["cookie_present"]:
                 return error(403, "FIXTURE_CREDENTIAL_LEAK")
             if method != "GET" or not path.startswith("/audio/"):
                 return error(404, "FIXTURE_UNEXPECTED_DOWNLOAD")
             if self.case == "audio-redirect":
-                return 302, {"Location": "https://flowspeech.io/redirect-target"}, b""
+                return 302, {"Location": "https://forbidden:fixture@flowspeech.io/redirect-target"}, b""
+            if self.case == "audio-redirect-safe":
+                return 302, {"Location": "https://flowspeech.io/audio/redirected.wav"}, b""
             content = b"not-a-riff-file" if self.case == "malformed" else fixture_wav()
             return 200, {"Content-Type": "audio/wav"}, content
         if host != "flowspeech.io":

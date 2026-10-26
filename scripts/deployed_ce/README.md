@@ -1,10 +1,11 @@
 # Deployed CE Release Gate
 
-This deployed-platform gate is **not yet passed**. Run 40310456564 passed isolation
-and installed the exact package through CE and the real daemon. It then stalled
-on /info before credentials existed. The driver now checks installed /tools before
-adding credentials, then verifies /info. This ordering fix awaits another deployed
-run; offline tests do not establish workflow success. See VALIDATION.md for evidence.
+This deployed-platform gate is **not yet passed**. Run 40312866581 passed isolation,
+installation, credentials, basic persisted WAV, real 200.407-second completion,
+malformed WAV and API redirect rejection. The audio-redirect fixture incorrectly
+expected a valid HTTPS redirect to fail. It now tests an unsafe URL, plus a separate
+credential-free HTTPS redirect success case. Both corrected cases and the requested
+and host deadline cases await a new deployed run. See VALIDATION.md for evidence.
 Keep Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 draft until the coordinator reviews actual CI evidence and the Cloud limitation.
 
@@ -67,8 +68,10 @@ the unsigned review candidate; this does not prove Marketplace signature accepta
 - A start/tool/end workflow downloads the WAV from CE's persisted file service,
   compares its exact bytes, and retains job/request recovery metadata.
 - A real 200-second job completes with host 300/tool 295. No simulated clock.
-- Malformed WAV and API/audio redirects produce recovery errors, no audio,
+- Malformed WAV and API/unsafe-audio redirects produce recovery errors, no audio,
   no redirect follow, and exactly one job submission.
+- A safe HTTPS audio redirect between the two isolated hosts produces one persisted
+  WAV through exactly two credential-free download hops and one submission.
 - A short requested deadline returns recovery metadata without resubmission.
 - Restart the actual daemon with host 180; a 200-second pending job returns
   recovery before 180 seconds, exercising the tool's 175-second cap.
@@ -76,7 +79,8 @@ the unsigned review candidate; this does not prove Marketplace signature accepta
   separated by at least five seconds, allowing small measurement tolerance.
 
 Retained evidence includes `install.json`, `run.json`, `short-host.json`,
-`runtime-identity.json`, `isolation.json`, package audit, pinned image/package
+`runtime-identity.json`, `isolation.json`, persisted WAV hashes, failed-case mock
+audits when available, package audit, pinned image/package
 identities, dependency-wheel hashes, and bounded redacted service logs.
 `summary.json` reports CE success only when isolation and all three stages pass and always
 reports Cloud as unvalidated. A failed diagnostics redaction check prevents
@@ -87,9 +91,9 @@ job's Compose project and volumes; artifacts expire after seven days.
 ## Exact Remaining Gates
 
 1. This workstation has no Docker/Podman/Colima. Source and offline harness tests
-   pass. CI passed startup, isolation and real daemon installation. Provider
-   credential validation/persistence, workflow execution, runtime file storage and
-   both real-time waits still require another CI run after the driver fix. An
+   pass. CI passed startup, isolation, installation, credentials, file persistence
+   and real 200-second completion. Both audio-redirect cases, the short requested
+   deadline and the 180-second daemon stage still require another CI run. An
    integration failure is a failed gate, not an SDK-only substitute.
 2. Even a passing run covers this headless CE configuration only. It does not
    validate the web UI, a separately deployed reverse proxy, actual production

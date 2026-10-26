@@ -4,19 +4,19 @@
 
 Marketplace update PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 is open and draft. Do not mark deployed CE or Cloud validation complete based on
-the SDK/source suites. The `Deployed CE release gate` has passed real CE isolation
-and installation, but not credential or workflow validation. Its 83 offline harness
-checks pass within the 271-test source suite; the unchanged package passes 188 tests.
-The first CI attempt failed workflow validation before scheduling any jobs;
-the invalid job-level runner context has been moved to step-time initialization.
-Run [40310456564](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40310456564)
-passed the corrected isolation guard, installed the package through the real daemon,
-and matched all eight plugin Python files. It then timed out waiting on provider
-/info before adding credentials. The pinned CE contract returns 400 until those
-credentials exist. The driver now checks /tools first and retains /info validation
-after credential save; permanent client errors fail immediately. All workflow
-assertions and timing bounds remain in place, and both workflows pass actionlint.
-Another deployed run is required; see VALIDATION.md for exact evidence and limits.
+the SDK/source suites. Its 94 offline harness checks pass within the 282-test source
+suite; the unchanged package passes 188 tests. Both workflows pass actionlint.
+Run [40312866581](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40312866581)
+passed isolation, installation, credential rejection/save, basic persisted WAV,
+real 200.407-second completion, malformed audio and API redirect rejection.
+It then failed because the audio-redirect fixture expected rejection of a valid
+HTTPS redirect, which the unchanged adapter intentionally supports without
+credentials. The fixture now tests an unsafe URL, and an additional positive
+case requires exactly two credential-free HTTPS hops and exact persisted audio.
+Forbidden-target, recovery-ID, no-resubmission and deadline assertions remain.
+The 10-second requested deadline and 180-second daemon stage were not reached.
+Another deployed run is required for a full CE pass; Cloud remains unvalidated.
+See VALIDATION.md for audited partial results, artifact hashes and remaining limits.
 The reviewed 125757-byte package remains unchanged at SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
 
@@ -25,7 +25,7 @@ to `codex/public-api-v1`; that push triggers the next bounded CE job. No secret
 configuration is needed. Follow `scripts/deployed_ce/README.md` for exact run/watch/
 download commands, failure evidence, cleanup and the separate Cloud access gate.
 The workstation has no container runtime; no deployed pass is claimed locally.
-Do not expand this first run to paid APIs, external deployments or browser sessions.
+Do not expand this gate to paid APIs, external deployments or browser sessions.
 
 Before a new commit, verify local `user.email` is
 `waeckerlinfederowicz66@gmail.com`. Preserve user.name, global configuration and

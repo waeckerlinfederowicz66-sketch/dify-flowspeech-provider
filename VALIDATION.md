@@ -2,10 +2,66 @@
 
 Date: 2026-10-26. Final release-gate follow-up in an isolated migration checkout.
 The release artifact passes 188 tests (previous baseline 94). Current source also
-includes 83 offline tests of the deployed-CE harness, for 271 source tests.
+includes 94 offline tests of the deployed-CE harness, for 282 source tests.
 The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
 
-## Deployed CE gate (installed; workflows pending)
+## Deployed CE gate (partial workflow evidence; not passed)
+
+[CI run 40312866581](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40312866581)
+on commit 04babce passed isolation, real daemon installation and credential
+validation, then completed four workflow cases before a fixture assertion failed.
+The exact package SHA-256 matches the final artifact below, and all eight installed
+plugin Python files match the reviewed archive. No plugin code was changed.
+
+The sanitized artifact (ID 12645244483, 25919 bytes) was downloaded and verified:
+SHA-256 ccc1e229d72769662a5f119beda123163662c4e11875eb7a9103f0fcdd5c2bb2.
+Its summary remains ce_passed=false and cloud_passed=false; isolation and install
+passed, run failed and short-host did not run. Audited completed results:
+
+| Case | Real elapsed | Creates / polls / downloads | Result |
+| --- | --- | --- | --- |
+| Provider credentials | not timed | quota-only validation | Invalid rejected; valid saved |
+| Basic | 21.840s | 1 / 1 / 1 | One persisted WAV and recovery metadata |
+| Slow | 200.407s | 1 / 40 / 1 | One persisted WAV, host 300/tool 295 |
+| Malformed WAV | 5.164s | 1 / 1 / 1 | Recovery error, no audio output |
+| API redirect | 0.154s | 1 / 0 / 0 | No redirect follow or audio output |
+
+Completed-case audits contain no storage Authorization or cookies, no second
+submission and no forbidden target. The slow case's minimum poll interval is
+5.005322s. Successful audio cases are recorded only after downloading from CE's
+file service and comparing every byte with the 18044-byte fixture. That fixture's
+SHA-256 is ef2b9384c28fa5e94babe9397b3c7201393c4fe9b7e4c39c0683a3f944b2e7ad;
+this run did not retain the separately calculated persisted-file hash.
+
+Failure: audio-redirect reported "A redirect was followed". The fixture had sent
+a valid HTTPS redirect, but the harness expected all audio redirects to fail.
+The unchanged adapter and public README explicitly support credential-free HTTPS
+audio redirects while refusing API redirects and unsafe audio URLs. The wrong
+fixture expectation is not evidence of an adapter regression. The failed case's
+audit was not retained, so its credential behavior is not independently claimed.
+
+The negative fixture now redirects to an unsafe URL with userinfo, preserving the
+no-forbidden-target, no-audio and recovery-ID assertions. A new positive
+audio-redirect-safe case follows HTTPS between the two already-isolated hosts,
+requires exactly two credential-free download hops, one submission, matching
+recovery IDs and the exact persisted WAV. It does not bypass any negative case.
+Persisted audio SHA-256 and failed-case mock audits will now be retained. The
+production adapter, package, host time limits and Compose isolation are unchanged.
+
+Current local checks: 94 harness tests passed (0.16s), 282 source tests passed
+(2.43s), and the unchanged extracted package passed 188 tests (2.36s). Full and
+package suites retain the same two SDK warnings. Both workflows pass actionlint
+1.7.7 and the package audit passes. Eleven new regressions exercise the actual
+adapter against the fixture, reject credentials at the redirect destination,
+and prove the driver still rejects forbidden targets, credential leaks, extra
+hops and persisted-byte mismatches.
+
+Next deployed run must pass both audio-redirect cases, the short requested
+deadline and the actual 180-second daemon stage. The latter two were not reached
+in this run. This is partial headless CE evidence only, not a complete CE pass or
+Cloud, browser/UI, reverse-proxy or production-storage validation.
+
+### Previous credential-readiness failure
 
 [CI run 40310456564](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40310456564)
 on commit b60394d passed isolation and installed the exact package through CE and
@@ -108,7 +164,7 @@ only; it did not establish a deployed CE or Cloud pass.
 Go daemon, PostgreSQL and Redis. It installs the unchanged reviewed package through
 CE, validates provider credentials, runs start/tool/end workflows, retrieves the
 persisted WAV, and checks real 200-second completion and a 180-second host deadline.
-Malformed audio, redirect refusal, credential-free downloads and no resubmission
+Malformed audio, API/unsafe-audio redirect refusal, credential-free downloads and no resubmission
 are checked through the deployed workflow rather than an SDK shim.
 
 All deployed containers use an internal network or no network, with no published ports.
@@ -119,8 +175,8 @@ the reviewed package. No plugin source or clocks are changed. This trust setup
 and test-only acceptance of an unsigned package are explicitly disclosed limits.
 
 No Docker runtime is installed here and this worker did not push or dispatch CI.
-The later run passed isolation and installation as recorded above; credential
-validation, workflow routing, persisted output and real deadlines remain pending.
+Later runs passed isolation, installation, credentials and several workflows as
+recorded above; the remaining redirect/deadline cases keep the full gate open.
 See `scripts/deployed_ce/README.md` for coordinator commands and retained evidence.
 
 PR 3513 was verified open and draft. Cloud remains unvalidated: it requires an
@@ -207,7 +263,8 @@ email, pushes or publication were made by this worker. Validation changes are
 committed locally for coordinator review; no OIDC or authentication changes were
 made. Public asset, Marketplace and CI reads were used for release verification.
 Existing changes were preserved.
-No end-to-end production generation or deployed Dify verification is claimed.
+No production generation or complete deployed Dify pass is claimed. Partial CE
+evidence is limited to the completed cases identified at the top of this report.
 A single in-flight HTTP request may finish cleanup after the local caller deadline;
 it cannot submit a retry or another recording. Recover accepted jobs with their
 original request/job UUID instead of submitting new input.
@@ -227,8 +284,8 @@ The actual SDK serverless request reader also stays open until a simulated
 error without audio or a second POST. No heartbeat workaround is used.
 
 The rebuilt package includes runtime_config.py. Actual SDK entrypoints and the
-intended result hostname are now verified below. Deployment-specific enforcement
-still requires platform access; no Cloud/CE installation is claimed.
+intended result hostname are verified below. These SDK-only checks did not establish
+installation; the later partial CE evidence is recorded at the top of this report.
 
 ## Runtime and egress follow-up
 
@@ -273,7 +330,7 @@ environment domain. No production database/configuration API was queried.
 
 ## Remaining platform access
 
-- To verify deployment enforcement, a reviewer needs a Dify CE or Cloud workspace
+- Beyond the isolated CI configuration, a reviewer needs a Dify CE or Cloud workspace
   with plugin-install/workflow permissions, plus operator access to the deployed
   plugin daemon or managed-platform timeout and egress policy. Docker is not
   installed locally; the SDK process smoke tests do not install a complete platform.

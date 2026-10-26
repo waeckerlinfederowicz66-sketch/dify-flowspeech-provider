@@ -8,6 +8,7 @@ from urllib.error import HTTPError
 import uuid
 import wave
 
+import httpx
 import pytest
 import yaml
 
@@ -15,6 +16,7 @@ from scripts.deployed_ce import check_isolation, collect, driver
 from scripts.deployed_ce.collect import redact
 from scripts.deployed_ce.driver import file_url, graph, terminal_event
 from scripts.deployed_ce.mock_http import State, fixture_wav
+from flowspeech_v1 import ApiError, V1Client, make_input
 
 ROOT = Path(__file__).resolve().parents[1]
 GATE = ROOT / "scripts" / "deployed_ce"
@@ -71,8 +73,109 @@ def test_negative_mock_cases(case):
     else:
         status, headers, body = state.handle("GET", "static.flowspeech.io", "/audio/fixture.wav", {}, b"")
         assert status == (302 if case == "audio-redirect" else 200)
+        if case == "audio-redirect":
+            assert headers["Location"] == "https://forbidden:fixture@flowspeech.io/redirect-target"
         if case == "malformed":
             assert not body.startswith(b"RIFF")
+
+
+@pytest.mark.parametrize("case", ["api-redirect", "audio-redirect", "audio-redirect-safe"])
+def test_redirect_fixture_matches_unchanged_adapter_contract(case):
+    now = [0.0]
+    state = State(KEY, clock=lambda: now[0])
+    state.configure(case, 1)
+
+    def handle(request):
+        status, headers, body = state.handle(request.method, request.url.host, request.url.path,
+                                            dict(request.headers), request.content)
+        return httpx.Response(status, headers=headers, **({"content": body} if isinstance(body, bytes) else {"json": body}))
+
+    transport = httpx.MockTransport(handle)
+    with httpx.Client(transport=transport) as api, httpx.Client(
+            transport=transport, follow_redirects=True, auth=("ignored", "ignored"),
+            headers={"Authorization": "ignored"}, cookies={"session": "ignored"}) as download:
+        client = V1Client(api_key=KEY, http_client=api, download_client=download,
+                          clock=lambda: now[0], sleep=lambda delay: now.__setitem__(0, now[0] + delay))
+        if case == "audio-redirect-safe":
+            job, audio, request_id = client.generate(make_input("CE fixture " + case), request_id=REQUEST_ID)
+            assert audio == fixture_wav() and request_id == REQUEST_ID and job["id"] in state.jobs
+        else:
+            with pytest.raises(ApiError) as caught:
+                client.generate(make_input("CE fixture " + case), request_id=REQUEST_ID)
+            assert caught.value.request_id == REQUEST_ID
+            if case == "audio-redirect":
+                assert caught.value.code == "download_failed" and caught.value.job_id in state.jobs
+            else:
+                assert caught.value.code == "redirect_refused" and not state.jobs
+    assert len([c for c in state.calls if c["method"] == "POST"]) == 1
+    assert all(c["path"] != "/redirect-target" for c in state.calls)
+    downloads = [c for c in state.calls if c["path"].startswith("/audio/")]
+    assert len(downloads) == {"api-redirect": 0, "audio-redirect": 1, "audio-redirect-safe": 2}[case]
+    assert all(not c["authorization_present"] and not c["cookie_present"] for c in downloads)
+    if case == "audio-redirect-safe":
+        assert [c["host"] for c in downloads] == ["static.flowspeech.io", "flowspeech.io"]
+
+
+@pytest.mark.parametrize("headers", [{"Authorization": "Bearer " + KEY}, {"Cookie": "session=fixture"}])
+def test_mock_redirect_destination_rejects_credentials(headers):
+    state = State(KEY)
+    state.configure("audio-redirect-safe", 1)
+    assert state.handle("GET", "flowspeech.io", "/audio/redirected.wav", headers, b"")[0] == 403
+
+
+@pytest.mark.parametrize("defect", [None, "forbidden", "authorization", "cookie", "extra-hop", "persisted-audio"])
+def test_deployed_case_keeps_redirect_credentials_and_persistence_assertions(monkeypatch, defect):
+    job_id = "22222222-2222-4222-8222-222222222222"
+
+    class WorkflowConsole:
+        fixture = {"api_key": KEY}
+
+        def __init__(self):
+            self.opener = self
+
+        def json(self, path, **kwargs):
+            if path == "/apps":
+                return {"id": job_id}
+            self.request_id = kwargs["body"]["graph"]["nodes"][1]["data"]["tool_configurations"]["request_id"]
+            return {}
+
+        def control(self, path, payload=None):
+            if path == "/configure":
+                assert payload["case"] == "audio-redirect-safe"
+                return {}
+            calls = [
+                {"host": "flowspeech.io", "path": "/api/v1/tts/jobs", "method": "POST", "elapsed": 0,
+                 "request_id": self.request_id, "authorization_present": True, "cookie_present": False},
+                {"host": "flowspeech.io", "path": "/api/v1/tts/jobs/" + job_id, "method": "GET", "elapsed": 5},
+                {"host": "static.flowspeech.io", "path": "/audio/" + job_id + ".wav", "method": "GET",
+                 "authorization_present": False, "cookie_present": False},
+                {"host": "flowspeech.io", "path": "/audio/redirected.wav", "method": "GET",
+                 "authorization_present": defect == "authorization", "cookie_present": defect == "cookie"}]
+            if defect == "forbidden":
+                calls.append({"host": "flowspeech.io", "path": "/redirect-target", "method": "GET"})
+            if defect == "extra-hop":
+                calls.append(dict(calls[-1]))
+            return {"calls": calls, "jobs": {job_id: {"id": job_id}}}
+
+        def open(self, path, **kwargs):
+            if path.startswith(driver.BASE + "/files/"):
+                return io.BytesIO(b"wrong persisted bytes" if defect == "persisted-audio" else fixture_wav())
+            outputs = {"audio": [{"url": "/files/tools/fixture.wav"}],
+                       "metadata": [{"requestId": self.request_id, "jobId": job_id}]}
+            event = {"event": "workflow_finished", "data": {"status": "succeeded", "outputs": outputs}}
+            return io.BytesIO(("data: " + json.dumps(event) + "\n").encode())
+
+    clock = iter([0, 5])
+    monkeypatch.setattr(driver.time, "monotonic", lambda: next(clock))
+    console = WorkflowConsole()
+    if defect:
+        with pytest.raises(AssertionError):
+            driver.run_case(console, "audio-redirect-safe", delay=1, timeout=300, expect_audio=True, minimum=4.8, maximum=60)
+        assert console.current_audit is not None
+    else:
+        result = driver.run_case(console, "audio-redirect-safe", delay=1, timeout=300, expect_audio=True, minimum=4.8, maximum=60)
+        assert result["downloads"] == 2 and result["creates"] == 1 and result["audio_files"] == 1
+        assert result["persisted_audio_sha256"] == hashlib.sha256(fixture_wav()).hexdigest()
 
 
 @pytest.mark.parametrize("url", ["https://flowspeech.io/files/a", "http://evil.test/files/a",
@@ -162,7 +265,7 @@ def test_driver_waits_for_installed_tools_then_saves_credentials_before_info(mon
     progress = []
     assert driver.run(console, progress=progress) is progress
     assert progress[0] == {"case": "provider-credentials", "invalid_rejected": True, "valid_saved": True}
-    assert [case for case, _ in calls] == ["basic", "slow", "malformed", "api-redirect", "audio-redirect", "deadline"]
+    assert [case for case, _ in calls] == ["basic", "slow", "malformed", "api-redirect", "audio-redirect", "audio-redirect-safe", "deadline"]
     assert calls[1][1] == {"delay": 200, "timeout": 300, "expect_audio": True, "minimum": 199, "maximum": 295}
     assert calls[-1][1] == {"delay": 200, "timeout": 10, "expect_audio": False, "minimum": 4, "maximum": 15}
 
