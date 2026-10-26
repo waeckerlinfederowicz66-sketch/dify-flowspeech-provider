@@ -2,10 +2,66 @@
 
 Date: 2026-10-26. Final release-gate follow-up in an isolated migration checkout.
 The release artifact passes 188 tests (previous baseline 94). Current source also
-includes 94 offline tests of the deployed-CE harness, for 282 source tests.
+includes 112 offline tests of the deployed-CE harness, for 300 source tests.
 The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
 
-## Deployed CE gate (partial workflow evidence; not passed)
+## Deployed CE gate (main cases passed; short-host pending)
+
+[CI run 40323882509](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40323882509)
+ran exact head 23da25ba8ac71a94c5cec3c775cec1765a6e69ae. Isolation, real installation
+and the entire main workflow stage passed. The 180-second host stage failed just
+after daemon recreation, before measuring the intended long-running job.
+
+Sanitized artifact ID 12649854921, 26236 bytes, verified SHA-256:
+6275ddf7d65f6d13c0eb05a04e912fc3dd81dd98d318b9432a48a0fbbcfafa4b.
+Package audit matches the unchanged 125757-byte final archive; all eight installed
+Python files match. The summary reports run=passed, short-host=failed and both
+ce_passed/cloud_passed=false. Audited main-stage evidence:
+
+| Case | Real elapsed | Creates / polls / downloads | Result |
+| --- | --- | --- | --- |
+| Provider credentials | not timed | quota-only validation | Invalid rejected; valid saved |
+| Basic | 23.529s | 1 / 1 / 1 | One persisted WAV |
+| Slow | 200.382s | 1 / 40 / 1 | One persisted WAV, host 300/tool 295 |
+| Malformed WAV | 5.145s | 1 / 1 / 1 | Recovery IDs, no audio |
+| API redirect | 0.136s | 1 / 0 / 0 | Refused; no target request |
+| Unsafe audio redirect | 5.138s | 1 / 1 / 1 | Refused; no target request |
+| Safe HTTPS audio redirect | 5.153s | 1 / 1 / 2 | One WAV, both hops credential-free |
+| Requested timeout 10s | 5.130s | 1 / 1 / 0 | Recovery IDs before deadline, no audio |
+
+All three persisted-file hashes are recorded in run.json and equal:
+ef2b9384c28fa5e94babe9397b3c7201393c4fe9b7e4c39c0683a3f944b2e7ad.
+The driver downloaded each file through CE and checked exact fixture bytes.
+All completed cases have one submission, no forbidden redirect target and no
+Authorization/cookies on any storage hop. Slow-job minimum poll interval:
+5.004944s. No second recording or live production request was used.
+
+Short-host failure is a startup race, not a measured timeout failure. Daemon logs
+show local runtime startup at 12:42:55.103 UTC, metadata requests returning 200,
+then dispatch at 12:42:55.569 failing with "no available node, plugin runtime not
+found". /tools and /info expose installed metadata, not an available process.
+The workflow failed before any long-running job could validate host 180/tool 175.
+
+The driver now waits up to 90 seconds for actual post-restart dispatch before
+starting the measured workflow. It sends deliberately invalid fixture credentials
+through the existing CE validation route; readiness requires INVALID_API_KEY plus
+observed quota-only requests and zero jobs. Only the specific runtime-not-found
+startup response is retried. Invalid-credential acceptance, unrelated auth/TLS/
+redirect errors, malformed responses or any audio creation fail the gate. Probe
+requests are bounded to at most 10 seconds each. There is no generation retry,
+blind sleep or metadata-only substitute, and credentials are not added again.
+Readiness results are separate from the unchanged 160 <= elapsed < 180 assertion;
+the plugin's 175-second cap and all host/network configuration remain unchanged.
+
+Current local results: 112 harness tests passed (0.15s), 300 source tests passed
+(2.48s), unchanged extracted package 188 passed (2.19s), with the same two SDK
+warnings in full/runtime suites. Eighteen new regressions cover startup retries,
+deadline exhaustion, quota-only proof, auth denial, unexpected HTTP/TLS/redirect
+errors and ordering before the sole measured generation. Both workflows pass
+actionlint 1.7.7, package audit and git diff checks pass. The fix still needs CI;
+complete CE validation is not claimed. Cloud remains unvalidated and PR 3513 draft.
+
+### Previous redirect-fixture failure
 
 [CI run 40312866581](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40312866581)
 on commit 04babce passed isolation, real daemon installation and credential

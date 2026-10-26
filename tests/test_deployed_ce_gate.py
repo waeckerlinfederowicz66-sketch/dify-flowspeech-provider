@@ -295,15 +295,127 @@ def test_short_host_requires_existing_saved_credentials_without_adding_again(mon
     calls = []
     monkeypatch.setenv("GATE_HOST_TIMEOUT", "180")
     monkeypatch.setattr(driver, "run_case", lambda client, case, **kwargs: calls.append((case, kwargs)) or {"case": case})
+
+    def ready(client):
+        assert client is console and console.saved and not calls
+        assert console.events == ["login", "/tools", "/info"]
+        console.events.append("runtime-ready")
+        return {"case": "runtime-readiness"}
+
+    monkeypatch.setattr(driver, "wait_for_runtime", ready)
     if saved:
-        assert driver.run(console, short_host=True) == [{"case": "deadline"}]
+        assert driver.run(console, short_host=True) == [{"case": "runtime-readiness"}, {"case": "deadline"}]
         assert calls == [("deadline", {"delay": 200, "timeout": 300, "expect_audio": False, "minimum": 160, "maximum": 180})]
     else:
         with pytest.raises(HTTPError) as caught:
             driver.run(console, short_host=True)
         assert caught.value.code == 400 and not calls
         assert console.current_case == "provider-saved-credentials"
-    assert console.events == ["login", "/tools", "/info"]
+    assert console.events == ["login", "/tools", "/info"] + (["runtime-ready"] if saved else [])
+
+
+def runtime_http_error(status, message):
+    body = message if isinstance(message, bytes) else json.dumps({"message": message}).encode()
+    return HTTPError(driver.BASE + "/console/api" + driver.PROVIDER_PATH + "/add", status,
+                     "Fixture readiness error", {}, io.BytesIO(body))
+
+
+class RuntimeProbeConsole:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.requests = []
+        self.audit = {"jobs": {}, "calls": [{"host": "flowspeech.io", "method": "GET", "path": "/api/v1/quota",
+                                            "authorization_present": True, "cookie_present": False}]}
+
+    def json(self, path, **kwargs):
+        self.requests.append((path, kwargs))
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    def control(self, path, payload=None):
+        if path == "/configure":
+            assert payload == {"case": "basic", "delay": 1}
+            return {}
+        assert path == "/audit"
+        return self.audit
+
+
+def test_runtime_readiness_retries_only_startup_then_proves_quota_dispatch(monkeypatch):
+    missing = "req_id: fixture PluginDaemonInternalServerError: no available node, plugin runtime not found"
+    console = RuntimeProbeConsole([runtime_http_error(400, missing), runtime_http_error(404, missing),
+                                   runtime_http_error(400, "PluginInvokeError: INVALID_API_KEY")])
+    now = [0.0]
+    monkeypatch.setattr(driver.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(driver.time, "sleep", lambda delay: now.__setitem__(0, now[0] + delay))
+    assert driver.wait_for_runtime(console, 90) == {
+        "case": "runtime-readiness", "attempts": 3, "elapsed_seconds": 6.0,
+        "invalid_rejected": True, "quota_calls": 1, "creates": 0}
+    assert console.current_case == "provider-runtime-readiness" and console.current_audit is console.audit
+    assert len(console.requests) == 3
+    for path, kwargs in console.requests:
+        assert path == driver.PROVIDER_PATH + "/add" and kwargs["method"] == "POST" and kwargs["timeout"] == 10
+        assert kwargs["body"]["credentials"] == {"api_key": "invalid-fixture-key"}
+
+
+def test_runtime_readiness_stops_before_starting_a_workflow_when_never_ready(monkeypatch):
+    missing = "PluginDaemonInternalServerError: no available node, plugin runtime not found"
+    console = RuntimeProbeConsole([runtime_http_error(400, missing) for _ in range(3)])
+    now = [0.0]
+    monkeypatch.setattr(driver.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(driver.time, "sleep", lambda delay: now.__setitem__(0, now[0] + delay))
+    with pytest.raises(RuntimeError, match="readiness deadline exceeded"):
+        driver.wait_for_runtime(console, 6)
+    assert now == [6.0] and len(console.requests) == 2
+    assert [kwargs["timeout"] for _, kwargs in console.requests] == [6.0, 3.0]
+
+
+@pytest.mark.parametrize("status,message", [
+    (400, "certificate verification failed"), (401, "Unauthorized"), (403, "Forbidden"),
+    (302, "Redirect"), (500, "Unrelated daemon error"), (400, b"not json"),
+    (400, b"x" * 65537), (400, {"nested": "invalid message"})])
+def test_runtime_readiness_does_not_hide_auth_tls_redirect_or_malformed_errors(monkeypatch, status, message):
+    console = RuntimeProbeConsole([runtime_http_error(status, message)])
+    monkeypatch.setattr(driver.time, "sleep", lambda _: pytest.fail("Non-startup errors must not be retried"))
+    with pytest.raises(RuntimeError):
+        driver.wait_for_runtime(console)
+    assert len(console.requests) == 1
+
+
+def test_runtime_readiness_rejects_host_accepting_invalid_credentials():
+    console = RuntimeProbeConsole([{"result": "success"}])
+    with pytest.raises(AssertionError, match="accepted invalid credentials"):
+        driver.wait_for_runtime(console)
+    assert len(console.requests) == 1
+
+
+def test_runtime_readiness_cannot_pass_after_its_deadline(monkeypatch):
+    console = RuntimeProbeConsole([runtime_http_error(400, "INVALID_API_KEY")])
+    clock = iter([0.0, 0.0, 0.0, 91.0])
+    monkeypatch.setattr(driver.time, "monotonic", lambda: next(clock))
+    with pytest.raises(RuntimeError, match="readiness deadline exceeded"):
+        driver.wait_for_runtime(console, 90)
+    assert len(console.requests) == 1
+
+
+@pytest.mark.parametrize("defect", ["no-quota", "job", "create", "wrong-host", "cookie", "no-auth"])
+def test_runtime_readiness_requires_observed_quota_only_probe(defect):
+    console = RuntimeProbeConsole([runtime_http_error(400, "INVALID_API_KEY")])
+    if defect == "no-quota":
+        console.audit["calls"] = []
+    elif defect == "job":
+        console.audit["jobs"] = {REQUEST_ID: {}}
+    elif defect == "create":
+        console.audit["calls"][0].update(method="POST", path="/api/v1/tts/jobs")
+    elif defect == "wrong-host":
+        console.audit["calls"][0]["host"] = "static.flowspeech.io"
+    elif defect == "cookie":
+        console.audit["calls"][0]["cookie_present"] = True
+    else:
+        console.audit["calls"][0]["authorization_present"] = False
+    with pytest.raises(AssertionError, match="readiness"):
+        driver.wait_for_runtime(console)
 
 
 @pytest.mark.parametrize("status", [301, 302, 400, 401, 403, 404, 422])

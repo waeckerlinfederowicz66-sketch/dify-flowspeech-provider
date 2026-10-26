@@ -140,6 +140,59 @@ def wait_for(check, seconds=300):
         time.sleep(3)
 
 
+def wait_for_runtime(console: Console, seconds=90):
+    """Require actual quota dispatch after restart, without creating audio or credentials."""
+    console.current_case = "provider-runtime-readiness"
+    console.control("/configure", {"case": "basic", "delay": 1})
+    started = time.monotonic()
+    attempts = 0
+
+    def ready():
+        nonlocal attempts
+        attempts += 1
+        remaining = seconds - (time.monotonic() - started)
+        if remaining <= 0:
+            raise RuntimeError("Plugin runtime readiness deadline exceeded")
+        try:
+            console.json(PROVIDER_PATH + "/add", method="POST", timeout=min(10, remaining), body={
+                "credentials": {"api_key": "invalid-fixture-key"},
+                "name": "Rejected readiness probe", "type": "api-key"})
+        except HTTPError as error:
+            body = error.read(65537)
+            if len(body) > 65536:
+                raise RuntimeError("Oversized runtime readiness error response") from None
+            try:
+                message = json.loads(body).get("message", "")
+            except (ValueError, AttributeError):
+                raise RuntimeError("Invalid runtime readiness error response") from None
+            if not isinstance(message, str):
+                raise RuntimeError("Invalid runtime readiness error message") from None
+            # Only the observed startup race is retryable, not credential/TLS/configuration failures.
+            if (error.code in {400, 404, 500, 502, 503}
+                    and "PluginDaemonInternalServerError" in message
+                    and "no available node, plugin runtime not found" in message):
+                return False
+            if error.code not in {400, 401, 403} or "INVALID_API_KEY" not in message:
+                raise RuntimeError(f"Plugin runtime readiness rejected unexpectedly (HTTP {error.code})") from None
+        else:
+            raise AssertionError("CE accepted invalid credentials during runtime readiness")
+        audit = console.control("/audit")
+        console.current_audit = audit
+        assert not audit["jobs"], "Runtime readiness created an audio job"
+        assert audit["calls"] and all(
+            c["host"] == "flowspeech.io" and c["method"] == "GET" and c["path"] == "/api/v1/quota"
+            and c["authorization_present"] and not c["cookie_present"] for c in audit["calls"]
+        ), "Runtime readiness must only validate quota with the rejected fixture credential"
+        elapsed = time.monotonic() - started
+        if elapsed >= seconds:
+            raise RuntimeError("Plugin runtime readiness deadline exceeded")
+        return {"case": "runtime-readiness", "attempts": attempts,
+                "elapsed_seconds": round(elapsed, 3),
+                "invalid_rejected": True, "quota_calls": len(audit["calls"]), "creates": 0}
+
+    return wait_for(ready, seconds)
+
+
 def install(console: Console, state: Path) -> dict:
     status = wait_for(lambda: console.json("/setup"), 600)
     if status.get("step") != "not_started":
@@ -241,6 +294,7 @@ def run(console, *, short_host=False, progress=None):
         assert os.environ["GATE_HOST_TIMEOUT"] == "180"
         console.current_case = "provider-saved-credentials"
         wait_for(lambda: console.json(PROVIDER_PATH + "/info"), 120)
+        results.append(wait_for_runtime(console))
         results.append(run_case(console, "deadline", delay=200, timeout=300, expect_audio=False, minimum=160, maximum=180))
         return results
     assert os.environ["GATE_HOST_TIMEOUT"] == "300"

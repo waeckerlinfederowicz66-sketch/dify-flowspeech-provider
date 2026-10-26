@@ -1,11 +1,11 @@
 # Deployed CE Release Gate
 
-This deployed-platform gate is **not yet passed**. Run 40312866581 passed isolation,
-installation, credentials, basic persisted WAV, real 200.407-second completion,
-malformed WAV and API redirect rejection. The audio-redirect fixture incorrectly
-expected a valid HTTPS redirect to fail. It now tests an unsafe URL, plus a separate
-credential-free HTTPS redirect success case. Both corrected cases and the requested
-and host deadline cases await a new deployed run. See VALIDATION.md for evidence.
+This deployed-platform gate is **not yet passed**. Run 40323882509 passed isolation,
+installation and every main-stage case, including real 200.382-second completion,
+both audio redirects and the requested deadline. The 180-second host stage raced
+daemon restart: metadata was ready before the plugin process. A bounded quota-only
+dispatch probe now precedes that stage; it and the actual host deadline still need
+CI validation. See VALIDATION.md for audited timings and persisted-file hashes.
 Keep Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 draft until the coordinator reviews actual CI evidence and the Cloud limitation.
 
@@ -73,7 +73,10 @@ the unsigned review candidate; this does not prove Marketplace signature accepta
 - A safe HTTPS audio redirect between the two isolated hosts produces one persisted
   WAV through exactly two credential-free download hops and one submission.
 - A short requested deadline returns recovery metadata without resubmission.
-- Restart the actual daemon with host 180; a 200-second pending job returns
+- Restart the actual daemon with host 180 and wait at most 90 seconds for actual
+  invalid-credential dispatch to reach only quota, with no saved credential or job.
+  Retry only the known runtime-not-found startup response; other errors fail.
+  Then a single 200-second pending job returns
   recovery before 180 seconds, exercising the tool's 175-second cap.
 - Storage downloads never contain Authorization or cookies; default polls are
   separated by at least five seconds, allowing small measurement tolerance.
@@ -91,9 +94,10 @@ job's Compose project and volumes; artifacts expire after seven days.
 ## Exact Remaining Gates
 
 1. This workstation has no Docker/Podman/Colima. Source and offline harness tests
-   pass. CI passed startup, isolation, installation, credentials, file persistence
-   and real 200-second completion. Both audio-redirect cases, the short requested
-   deadline and the 180-second daemon stage still require another CI run. An
+   pass. CI passed startup, isolation, installation and all main-stage cases,
+   including file hashes, real 200-second completion, both audio redirects and
+   the short requested deadline. Restart readiness and the 180-second daemon
+   stage still require another CI run. An
    integration failure is a failed gate, not an SDK-only substitute.
 2. Even a passing run covers this headless CE configuration only. It does not
    validate the web UI, a separately deployed reverse proxy, actual production

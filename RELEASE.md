@@ -4,18 +4,19 @@
 
 Marketplace update PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 is open and draft. Do not mark deployed CE or Cloud validation complete based on
-the SDK/source suites. Its 94 offline harness checks pass within the 282-test source
+the SDK/source suites. Its 112 offline harness checks pass within the 300-test source
 suite; the unchanged package passes 188 tests. Both workflows pass actionlint.
-Run [40312866581](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40312866581)
-passed isolation, installation, credential rejection/save, basic persisted WAV,
-real 200.407-second completion, malformed audio and API redirect rejection.
-It then failed because the audio-redirect fixture expected rejection of a valid
-HTTPS redirect, which the unchanged adapter intentionally supports without
-credentials. The fixture now tests an unsafe URL, and an additional positive
-case requires exactly two credential-free HTTPS hops and exact persisted audio.
-Forbidden-target, recovery-ID, no-resubmission and deadline assertions remain.
-The 10-second requested deadline and 180-second daemon stage were not reached.
-Another deployed run is required for a full CE pass; Cloud remains unvalidated.
+Run [40323882509](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40323882509)
+passed isolation, installation and all main cases: credential rejection/save,
+persisted WAV, real 200.382-second completion, malformed audio, API/unsafe-audio
+redirect rejection, safe credential-free HTTPS redirect and short requested deadline.
+All three persisted WAV hashes match. The 180-second stage failed immediately after
+daemon recreation because installed metadata was available before the plugin process.
+A bounded, quota-only invalid-credential dispatch probe now waits for that actual
+runtime before the sole measured generation. It does not relax auth denial, network
+isolation, no-resubmission, host 180/tool 175 or the 160-to-180-second assertion.
+The restart-readiness fix and host deadline still require CI. Cloud is unvalidated;
+Marketplace remains draft pending that scope decision and complete CE evidence.
 See VALIDATION.md for audited partial results, artifact hashes and remaining limits.
 The reviewed 125757-byte package remains unchanged at SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
