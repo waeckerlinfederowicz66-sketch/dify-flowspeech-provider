@@ -2,6 +2,24 @@
 
 ## Current deployed-validation handoff
 
+The current unpublished 0.2.0 candidate is 126197 bytes/17 members, SHA-256:
+`5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4`.
+The coordinator committed it at the existing draft Marketplace binary path in
+commit `1024cfe3385e390626e0e4253b23d4c6b9469651`. Shared pins now use that immutable
+commit, and the main `dist/flowspeech-0.2.0.difypkg` matches the downloaded bytes.
+Only packaged README/PRIVACY changed; eight Python files, manifest, requirements,
+icon and all other members remain byte-identical. The old archive is retained
+under `.tools/package-archive/` with its full hash in the filename.
+
+The replacement passes 386 source tests and 188 actual-package tests, but its
+**deployed CE and remote-debug gates are pending**. Push the reviewed source/pin
+commits to trigger both workflows; review the new hash in both retained artifacts
+before claiming either gate passed for this candidate. Keep PR 3513 draft pending
+the coordinator's final review. Cloud is an explicitly unvalidated limitation,
+not an invented absolute prerequisite. No worker public writes were made.
+
+## Historical deployed evidence: previous package
+
 The complete defined **isolated headless CE gate passed** in
 [run 40326427753](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40326427753),
 exact head 4ff46caacca3abfbe7615f6099009baf6c42ce4e. All nine retained files were
@@ -28,12 +46,12 @@ browser/UI, external proxies and managed egress policies remain unvalidated.
 No paid API was used. Fixture-CA trust and unsigned-package acceptance are test-only.
 Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513) remains
 draft pending the coordinator's review of Marketplace comments and Cloud scope.
-The reviewed 125757-byte package remains unchanged at SHA-256
+That run tested the previous 125757-byte package at SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
 
-Coordinator: review and push this documentation-only evidence update. No rebuild
-or package replacement is needed. The harness README is within the current CE
-workflow path filter, so pushing its update can trigger another bounded run.
+The same old package later passed remote-debug run 40336384519 attempt 2,
+including zero-leftover cleanup; see scripts/remote_debug/README.md. These
+historical passes do not transfer to the current documentation-replacement hash.
 The workstation has no container runtime; the deployed pass is from the audited
 GitHub-hosted job, not a local simulation. See `scripts/deployed_ce/README.md` for
 reproduction commands and the separate Cloud access gate.
@@ -140,24 +158,21 @@ These checks do not verify an external Go daemon, Cloud/CE installation, deploye
 egress enforcement, or outer workflow/proxy limits. See VALIDATION.md for exact
 reviewer permissions and operator configuration still needed.
 
-## Prepared marketplace update
+## Current marketplace candidate
 
-The local dify-marketplace-update checkout has branch
-codex/flowspeech-v0.2.0-update based on upstream main
-954626f01c93d8e74cad8ef115cc3c901cd89cc0. Its only candidate change is:
+The coordinator updated the original draft PR 3513 with ordinary commit
+`1024cfe3385e390626e0e4253b23d4c6b9469651`. Its candidate binary path remains:
 
     flowspeech/flowspeech/flowspeech-0.2.0.difypkg
 
-SHA-256: ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384
+SHA-256: 5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4
 
-The accepted package is unchanged. Current update rules require exactly one new
-.difypkg, with metadata already inside it. PR text is prepared outside that checkout
-in scripts/marketplace_update_pr.md. Keep the old package and upstream files intact.
-The public version check on 2026-10-26 found 0.1.0 published and 0.2.0 absent.
+The accepted 0.1.0 package is unchanged. The pending update still contains exactly
+one new .difypkg, with metadata already inside it. Local PR text is in
+scripts/marketplace_update_pr.md; the coordinator owns the actual PR body/state.
 
-The coordinator should resolve or explicitly disclose platform-test limitations,
-review the PR checklist, refresh upstream/version availability, commit only the
-new package, and push the local branch to the authorized fork before opening a
-new version-update PR against langgenius/dify-plugins main, referencing merged #3008.
-Do not reuse the closed PR. This worker did not commit, push or create a PR.
+After both new deployed gates pass for this exact hash, the coordinator reviews
+remaining requirements and documented limitations before changing PR readiness.
+Do not open a duplicate update PR or reuse closed PR 3008. This worker did not
+push, publish, change PR state or modify the official website.
 

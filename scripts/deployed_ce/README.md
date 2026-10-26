@@ -1,12 +1,20 @@
 # Deployed CE Release Gate
 
-The complete defined **isolated headless CE gate passed** in
+The current candidate in `pins.json` is the 126197-byte documentation replacement
+at immutable Marketplace commit `1024cfe3385e390626e0e4253b23d4c6b9469651`, SHA-256
+`5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4`.
+Its full CE and remote-debug deployed checks are pending; pushing the shared pins
+triggers both gates. No old result is transferred to the replacement.
+
+The complete defined **isolated headless CE gate passed for the previous package** in
 [run 40326427753](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40326427753)
 at head 4ff46caacca3abfbe7615f6099009baf6c42ce4e. Slow completion took 200.301s;
 after a 3.103s quota-only restart probe, host 180/tool 175 returned recovery at
 170.257s with one submission and no audio. All other cases, exact persisted WAV
 hashes, credential-free downloads and both isolation checks passed. The retained
-summary has ce_passed=true and cloud_passed=false; see VALIDATION.md for the full audit.
+summary has ce_passed=true and cloud_passed=false. Its package SHA-256 is
+`ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`;
+see VALIDATION.md for the historical audit.
 Keep Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 draft until the coordinator reviews actual CI evidence and the Cloud limitation.
 
@@ -95,10 +103,10 @@ job's Compose project and volumes; artifacts expire after seven days.
 ## Scope and Remaining Gates
 
 1. This workstation has no Docker/Podman/Colima. The CE pass is from the real
-   GitHub-hosted deployment, including the post-restart 180-second stage, not
+   GitHub-hosted deployment of the previous package, including the post-restart 180-second stage, not
    the source/SDK simulations. An integration failure in a future run must still
    fail the gate; do not substitute an SDK-only check.
-2. This passing run covers the pinned headless CE configuration only. It does not
+2. The historical passing run covers its pinned headless CE configuration only. It does not
    validate the web UI, a separately deployed reverse proxy, actual production
    storage overrides, other CE versions, or Dify Cloud's managed policies.
 3. Cloud needs a reviewer-authorized workspace with plugin-install/workflow
@@ -106,8 +114,9 @@ job's Compose project and volumes; artifacts expire after seven days.
    the plugin's fixed HTTPS hosts. Those facilities have not been supplied.
    Ordinary Cloud workspace access alone cannot safely redirect this unchanged
    package to a mock. Do not invoke production endpoints or change the package to
-   manufacture a Cloud pass. Document the limitation for reviewer acceptance or
-   keep the Cloud gate open and PR 3513 draft.
+   manufacture a Cloud pass. Document this unvalidated scope for reviewer acceptance;
+   the Marketplace template permits documented limitations rather than requiring
+   an unconditional Cloud pass. PR 3513 readiness remains the coordinator's decision.
 
 ## References
 

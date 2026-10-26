@@ -1,5 +1,9 @@
 # Plugin Submission
 
+Local coordinator draft only; updating this file does not change the public PR.
+Current candidate: immutable Marketplace commit
+`1024cfe3385e390626e0e4253b23d4c6b9469651`. New-hash deployed validation is pending.
+
 ## Plugin information
 
 - **Author**: flowspeech
@@ -61,16 +65,16 @@ No real credentials, private input or production generation was used in testing.
 
 ## Local validation
 
-- Source pytest suite: 188 passed; reviewed extracted package: 188 passed.
+- Source pytest suite: 386 passed; replacement extracted package: 188 passed.
 - Six new subprocess/manifest checks exercise the real SDK stdio registration,
   invocation, credential validation, WAV chunk serialization and session end.
 - Real SDK serverless HTTP /health and /invoke pass against source and the package
   using loopback plus mocked outbound HTTP. A simulated 200-second job completes
   with host 300/tool 295; host 180/tool 175 returns recovery IDs at simulated 170.
 - 2 existing SDK test warnings: gevent SSL import ordering and Pydantic Config deprecation.
-- Archive audit: 17 members, 125757 bytes; no prohibited development files, secret
+- Archive audit: 17 members, 126197 bytes; no prohibited development files, secret
   patterns, private local paths or executable tooling.
-- Package SHA-256: ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384.
+- Package SHA-256: 5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4.
 - Public version metadata on 2026-10-26: 0.1.0 exists; 0.2.0 not found.
 
 ## Reviewer notes
@@ -79,12 +83,12 @@ This is a draft update pending complete Dify deployment/remote-debugging
 validation required by the development guidelines. The unchecked guidelines
 item is deliberate; direct SDK tests do not substitute for that requirement.
 
-No complete Dify CE or Cloud installation or external Go daemon was exercised.
-Docker is unavailable in the test environment; the actual Python SDK entrypoints
-were used directly. A workspace reviewer/operator must still confirm installed
-plugin behavior, deployed timeout/egress enforcement and any admin storage-domain
-override. No live generation is claimed. Any on-platform production generation
-requires separately approved credentials and credits.
+The previous package (`ae19e420...c3384`) passed actual isolated CE run 40326427753
+and remote-debug run 40336384519 attempt 2, including cleanup. The replacement
+changes only README/PRIVACY; all runtime members are byte-identical, but those old
+passes do not validate its new archive hash. Both deployed gates must run again.
+Cloud, browser/UI, production services and managed egress policy remain unvalidated
+and are documented limitations, not claimed passes. No live generation is claimed.
 
 Breaking behavior is documented in the packaged README: the API now uses
 asynchronous jobs; legacy model/source/speed/format options are rejected; output

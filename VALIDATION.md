@@ -1,11 +1,21 @@
 # Validation: dify-flowspeech-provider 0.2.0
 
-Date: 2026-10-26. Final release-gate follow-up in an isolated migration checkout.
-The release artifact passes 188 tests (previous baseline 94). Current source also
-includes 112 offline tests of the deployed-CE harness, for 300 source tests.
-The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
+Date: 2026-10-26. Current unpublished documentation-replacement candidate:
+`dist/flowspeech-0.2.0.difypkg`, 126197 bytes, 17 members, SHA-256
+`5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4`.
+The immutable Marketplace commit is `1024cfe3385e390626e0e4253b23d4c6b9469651`;
+shared pins and main dist now match its downloaded binary. Only README/PRIVACY
+differ from the old package; eight Python files, manifest, dependencies, icon and
+all other members are identical. Old package bytes and run evidence are retained.
 
-## Deployed CE gate passed (isolated headless CE only)
+Current local validation: 386 source tests (188 runtime/package, 112 CE harness,
+86 remote harness), 188 tests against the actual replacement, artifact audit and
+all three workflow actionlint checks pass. The two existing SDK warnings remain.
+The replacement's deployed CE/remote-debug gates are **pending**. The historical
+CE and remote passes below cover only the previous `ae19e420...c3384` package and
+must not be attributed to this new hash. Cloud remains explicitly unvalidated.
+
+## Historical CE pass: previous package (isolated headless CE only)
 
 [CI run 40326427753](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40326427753)
 completed successfully at exact head 4ff46caacca3abfbe7615f6099009baf6c42ce4e.
@@ -19,8 +29,9 @@ Evidence archive: dify-ce-validation-40326427753, artifact ID 12651777580,
 497be24f760c90d5326652582dc3ad8af74831cb92190a5001f83c4dfcd3d7a9.
 The archive contains only install.json, isolation.json, package-audit.json,
 pins.json, run.json, runtime-identity.json, service-logs.txt, short-host.json and
-summary.json. The retained pins match the repository exactly: CE 1.18.0 and
-daemon 0.6.10-local, with digest-pinned images and 36 recorded wheel hashes.
+summary.json. The retained pins match the repository at that tested head: CE
+1.18.0 and daemon 0.6.10-local, with digest-pinned images and 36 recorded wheel
+hashes. Current package URL/hash pins have since changed; historical evidence has not.
 
 | Case | Actual elapsed | Creates / polls / downloads | Verified result |
 | --- | --- | --- | --- |
@@ -339,9 +350,10 @@ explicit handling of the Cloud limitation. No production service or paid generat
   class Config deprecation. Production main imports dify_plugin first.
 - git diff --check -> passed.
 
-## Final artifacts
+## Historical artifact used by the runs above
 
-- dist/flowspeech-0.2.0.difypkg: 125757 bytes, 17 members
+- Previous 0.2.0 archive: 125757 bytes, 17 members, now retained under
+  `.tools/package-archive/flowspeech-0.2.0-ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384.difypkg`
   SHA-256: ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384
 
 Archive inspection verified version metadata, safe member paths, forbidden

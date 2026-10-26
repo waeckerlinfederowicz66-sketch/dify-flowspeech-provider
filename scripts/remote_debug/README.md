@@ -3,7 +3,7 @@
 This independent, bounded CI job tests Dify's official TCP remote-debug protocol.
 It does not replace or modify the passed full CE gate (run `40326427753`, head
 `4ff46caacca3abfbe7615f6099009baf6c42ce4e`). **The supplemental gate passed in run
-40336384519 attempt 2 for the exact package hash below, including cleanup.**
+40336384519 attempt 2 for the previous `ae19e420...c3384` package, including cleanup.**
 This technical result is not Marketplace approval or a claim that a different
 replacement package has passed deployed validation.
 
@@ -33,10 +33,14 @@ are separate from the technical result; no submission state is changed here.
 ## Exact Candidate and Isolation
 
 Reuse `scripts/deployed_ce/pins.json`: CE 1.18.0, Go daemon 0.6.10-local, Python
-3.12.14, and all five Docker images by digest. The immutable package is
-`flowspeech-0.2.0.difypkg`, 125757 bytes, SHA-256:
+3.12.14, and all five Docker images by digest. The current immutable package is
+`flowspeech-0.2.0.difypkg`, 126197 bytes, SHA-256:
 
-`ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`
+`5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4`
+
+It is pinned to Marketplace commit `1024cfe3385e390626e0e4253b23d4c6b9469651`.
+Both deployed gates must run again for this replacement; old passes remain
+attributed to their original package below.
 
 All 17 members, including all eight Python files, are compared byte-for-byte
 before execution; per-Python-file hashes are retained. During a gate run no plugin
@@ -211,8 +215,8 @@ This pass is exclusively for the 125757-byte archive with SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
 It does not transfer to a documentation-replacement archive, even when Python,
 manifest, dependencies and icon bytes are identical. Keep the old package and
-evidence intact; only update pins after the coordinator supplies a real immutable
-Marketplace commit URL for the replacement, then rerun both deployed gates.
+evidence intact. The coordinator has now supplied a real immutable replacement
+commit, recorded below; both deployed gates still need a new pass.
 
 ## Documentation Replacement Candidate
 
@@ -237,9 +241,10 @@ unchanged Python hash plus manifest/dependency/icon hashes; the source and
 artifact XML test reports are beside it.
 
 This candidate has **not** passed deployed CE or remote-debug validation. The
-old root `dist/flowspeech-0.2.0.difypkg` and shared pins remain unchanged. The
-coordinator must first commit/push the replacement at the existing pending
-Marketplace binary path and supply its real immutable commit; only then update
-the package URL/hash and root dist copy, recheck tests and rerun both deployed
-gates. Do not invent an immutable URL or transfer old runtime evidence to this
-new hash. Marketplace readiness remains a separate review decision.
+coordinator pushed the replacement at the existing pending Marketplace binary
+path in commit `1024cfe3385e390626e0e4253b23d4c6b9469651`. Its immutable raw download
+was checked against the candidate, then copied to the main dist location; shared
+pins now use that URL and hash. The previous main dist archive is preserved under
+`.tools/package-archive/` with its full hash in the filename. Push the reviewed
+source/pin commits to trigger both deployed gates. Do not transfer old runtime
+evidence to this new hash. Marketplace readiness remains a separate review decision.

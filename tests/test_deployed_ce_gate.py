@@ -649,7 +649,9 @@ def test_log_redaction_does_not_retain_generated_auth():
 
 def test_reviewed_package_hash_is_pinned():
     pins = json.loads((GATE / "pins.json").read_text())
+    assert pins["package_sha256"] == "5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4"
     package = ROOT / "dist/flowspeech-0.2.0.difypkg"
     if package.exists():
         assert hashlib.sha256(package.read_bytes()).hexdigest() == pins["package_sha256"]
-    assert "/45c04d1b0ad75206ac5c3efb9cfc7f5685d845ac/" in pins["package_url"]
+        assert package.stat().st_size == 126197
+    assert "/1024cfe3385e390626e0e4253b23d4c6b9469651/" in pins["package_url"]
