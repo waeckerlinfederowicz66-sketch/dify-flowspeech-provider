@@ -8,7 +8,8 @@ import sys
 
 from scripts.deployed_ce.collect import redact
 
-COMPOSE = ["docker", "compose", "-f", str(Path(__file__).parent / "compose.yaml")]
+# Explicitly targeted startup does not enable profiles for later logs/down commands.
+COMPOSE = ["docker", "compose", "-f", str(Path(__file__).parent / "compose.yaml"), "--profile", "validation"]
 STAGES = ("isolation-initial", "bootstrap", "runtime-identity", "isolation-remote", "connected", "disconnected", "cleanup")
 ALLOWED = {name + ".json" for name in STAGES} | {"pins.json", "package-audit.json", "summary.json", "service-logs.txt"}
 PRIVATE_STATE = ("remote-key", "fixture.json", "runtime.env", "ca.key")
@@ -40,7 +41,7 @@ def check_evidence(evidence, sensitive):
 def cleanup(evidence):
     project = os.environ["COMPOSE_PROJECT_NAME"]
     assert re.fullmatch(r"flowspeech-remote-[0-9]+-[0-9]+", project), "Refusing non-job cleanup scope"
-    report = {"status": "failed"}
+    report = {"status": "failed", "compose_profiles": ["validation"]}
     try:
         subprocess.run(COMPOSE + ["down", "--volumes", "--remove-orphans"], check=True,
                        capture_output=True, text=True, timeout=90)
@@ -48,8 +49,9 @@ def cleanup(evidence):
                                   ("volumes", ["volume", "ls", "-q"])]:
             result = subprocess.run(["docker", *command, "--filter", "label=com.docker.compose.project=" + project],
                                     check=True, capture_output=True, text=True, timeout=10)
-            assert not result.stdout.strip(), "Project resources remain after cleanup"
-            report[resource + "_remaining"] = 0
+            report[resource + "_remaining"] = len(result.stdout.split())
+        leftovers = {name: report[name + "_remaining"] for name in ("containers", "networks", "volumes")}
+        assert not any(leftovers.values()), "Project resources remain after cleanup: " + json.dumps(leftovers)
         report["status"] = "passed"
     finally:
         (evidence / "cleanup.json").write_text(json.dumps(report, indent=2) + "\n")

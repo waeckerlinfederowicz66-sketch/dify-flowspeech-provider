@@ -2,8 +2,8 @@
 
 This independent, bounded CI job tests Dify's official TCP remote-debug protocol.
 It does not replace or modify the passed full CE gate (run `40326427753`, head
-`4ff46caacca3abfbe7615f6099009baf6c42ce4e`). **The remote-debug deployment has not
-yet run: local unit tests and workflow lint are not a remote-protocol pass.**
+`4ff46caacca3abfbe7615f6099009baf6c42ce4e`). **The first remote deployment passed
+its protocol stages but failed cleanup; the supplemental gate is not passed.**
 
 ## Official Contract
 
@@ -126,6 +126,49 @@ extraction verified all 17 members and eight Python-file hashes.
 
 Ignored local review evidence is under `.tools/remote-debug-candidate/`:
 `source-tests.xml`, `artifact-tests.xml`, and `package-identity.json`.
-There is no remote deployment evidence yet, because this machine has no Docker
-engine. No public push, workflow dispatch or Marketplace state change was made
-while preparing this candidate.
+This machine has no Docker engine. No public push, workflow dispatch or
+Marketplace state change was made by the implementation worker.
+
+## First Deployed Attempt
+
+[Run 40334275182](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40334275182)
+tested head `9e3fa43342e34fec7f13acf83dedb945aac0082e`. Both isolation checks,
+fresh workspace bootstrap, immutable runtime identity, actual remote credential
+dispatch, the full workflow and the disconnect negative test passed. The overall
+job failed its zero-leftover cleanup guard, so `remote_debug_passed` remains
+**false**; no Marketplace readiness is inferred.
+
+The invalid quota probe was rejected in 0.141 seconds (one GET, zero creates),
+and the valid credential save made one quota GET. The workflow succeeded in
+22.457 seconds with exactly one POST, one poll and one storage download, without
+storage authorization or cookies. The persisted WAV matched the hash above.
+After stopping the remote process, the same draft failed explicitly because its
+plugin was unavailable in 0.169 seconds: zero API/storage calls, zero creates,
+and zero remaining plugin installations. Runtime type was `remote`; all 17
+package members and eight Python hashes matched. The ephemeral credential files
+were removed. Cloud remains unvalidated.
+
+The retained artifact is `dify-remote-debug-40334275182` (ID `12656281757`,
+26135 bytes), SHA-256
+`c367f65c75ee32b94e1af8ded17cd582d4598dfd96c42e60f5425db44ae7882b`.
+Its 11 files are retained locally under
+`.tools/remote-debug-run-40334275182/evidence/`, beside `diagnostics.zip`.
+
+Cleanup returned successfully from Compose but failed at the first container
+inventory check; the original report did not retain container names or counts.
+The command omitted `--profile validation`, although `remote_plugin` is a
+declared profile service. [Compose's profile lifecycle](https://docs.docker.com/compose/how-tos/profiles/)
+requires enabling that profile for `down`; declared inactive-profile services
+are not orphans. The focused harness correction enables `validation` for
+collection and cleanup, preserving the zero-container/network/volume guard and
+retaining all three counts on failure. It also includes the remote client's
+logs in the existing secret-redaction path. A fresh complete CI pass, including
+cleanup, is still required after review and push.
+
+The focused cleanup revision passed 86 supplemental tests, 386 total source
+tests, 188 unchanged-package tests, all three workflow actionlint checks, and
+the artifact audit. Its local XML reports are
+`.tools/remote-debug-run-40334275182/fix-source-tests.xml` and
+`fix-artifact-tests.xml`. Existing full CE/runtime code and release-package
+bytes are unchanged; this result does not establish a successful cleanup on a
+real Docker host yet.

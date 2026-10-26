@@ -462,7 +462,57 @@ def test_cleanup_is_scoped_and_verifies_no_resource_leftovers(tmp_path, monkeypa
         collect.cleanup(tmp_path)
     assert "--remove-orphans" in calls[0]
     assert all("label=com.docker.compose.project=flowspeech-remote-123-1" in call for call in calls[1:])
-    assert json.loads((tmp_path / "cleanup.json").read_text())["status"] == ("failed" if leftover else "passed")
+    report = json.loads((tmp_path / "cleanup.json").read_text())
+    assert report["status"] == ("failed" if leftover else "passed")
+    assert report["compose_profiles"] == ["validation"]
+    assert {name: report[name + "_remaining"] for name in ("containers", "networks", "volumes")} == {
+        name: int(name == leftover) for name in ("containers", "networks", "volumes")}
+
+
+def test_cleanup_removes_explicitly_started_profile_service_not_counted_as_orphan(tmp_path, monkeypatch):
+    monkeypatch.setenv("COMPOSE_PROJECT_NAME", "flowspeech-remote-123-1")
+    compose = yaml.safe_load((GATE / "compose.yaml").read_text())
+    profiled = {name for name, service in compose["services"].items() if service.get("profiles")}
+    assert all(compose["services"][name]["profiles"] == ["validation"] for name in profiled)
+    # Model the observed lifecycle: explicitly started, then stopped, but still declared.
+    remaining = {"api", "remote_plugin"}
+
+    def run(command, **kwargs):
+        if "down" in command:
+            profiles = {command[i + 1] for i, word in enumerate(command[:-1]) if word == "--profile"}
+            remaining.difference_update(name for name, service in compose["services"].items()
+                                        if not service.get("profiles") or profiles.intersection(service["profiles"]))
+            # --remove-orphans cannot remove declared inactive-profile containers.
+            remaining.intersection_update(compose["services"])
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if "ps" in command:
+            output = "\n".join(sorted(remaining))
+        elif "network" in command or "volume" in command:
+            output = "still-attached-resource" if remaining else ""
+        else:
+            raise AssertionError(command)
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    monkeypatch.setattr(collect.subprocess, "run", run)
+    collect.cleanup(tmp_path)
+    assert remaining == set()
+    assert json.loads((tmp_path / "cleanup.json").read_text())["status"] == "passed"
+
+
+def test_logs_include_profiled_remote_client_and_redact_its_generated_secrets(tmp_path, monkeypatch):
+    monkeypatch.setenv("GATE_STATE", str(tmp_path))
+    monkeypatch.setattr(collect.sys, "argv", ["collect", "logs"])
+    (tmp_path / "fixture.json").write_text(json.dumps({"remote_debug_key": KEY, "api_key": "fixture-audio-secret"}))
+
+    def run(command, **kwargs):
+        assert "logs" in command and command[command.index("--profile") + 1] == "validation"
+        return subprocess.CompletedProcess(command, 0, "remote_plugin-1 | key=" + KEY + " credentials=fixture-audio-secret", "")
+
+    monkeypatch.setattr(collect.subprocess, "run", run)
+    collect.main()
+    retained = (tmp_path / "evidence/service-logs.txt").read_text()
+    assert "remote_plugin-1" in retained
+    assert KEY not in retained and "fixture-audio-secret" not in retained
 
 
 @pytest.mark.parametrize("project", ["", "dify", "flowspeech-ce-123-1", "flowspeech-remote-production"])
