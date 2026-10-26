@@ -1,28 +1,22 @@
 # Privacy Policy
 
-Last updated: September 2, 2026
+Last updated: October 26, 2026
 
-The FlowSpeech plugin connects a user's Dify workspace to the FlowSpeech text-to-speech API.
+The plugin sends synthesis text or ordered speaker segments, selected voices,
+a request UUID and the configured API key to FlowSpeech over HTTPS. The key is
+sent only to flowspeech.io in the Authorization header. Dify stores provider
+credentials according to the security controls of the user's deployment.
 
-## Data transmitted
+The plugin polls job metadata and downloads the completed WAV from the HTTPS
+result URL returned by FlowSpeech, potentially on a separate storage host.
+Downloads and redirects never carry the API key, cookies or API credentials.
+Result links are accessible to anyone holding the URL and should be kept private.
 
-When the tool runs, it sends the following data to `https://flowspeech.io`:
+The plugin does not persist input text, generated audio or credentials in local
+storage. Audio, job/request IDs and usage are returned to the Dify workflow.
+FlowSpeech retains scripts, task metadata and audio according to its published
+API retention policy. Local timeout does not cancel an accepted server job.
 
-- the text supplied to the tool;
-- the selected FlowSpeech voice name; and
-- the FlowSpeech API key supplied in the provider configuration.
-
-The API key is sent in the HTTPS Authorization header. Dify stores provider credentials according to the security controls of the user's Dify deployment.
-
-## Storage
-
-The plugin does not persist input text, generated audio, or API credentials in plugin-local storage. Generated audio is returned directly to the invoking Dify workflow.
-
-## Third-party processing
-
-Requests are processed by FlowSpeech under its published terms and privacy policy. Users should not submit content they are not authorized to process.
-
-## Contact
-
-Privacy questions may be sent to support@flowspeech.io.
+Users should submit only content they are authorized to process.
+Privacy contact: support@flowspeech.io.
 

@@ -1,6 +1,10 @@
 .env
 .venv/
+.test-tmp/
+.artifact-test/
 __pycache__/
 .pytest_cache/
 *.difypkg
+dist/
+.tools/
 

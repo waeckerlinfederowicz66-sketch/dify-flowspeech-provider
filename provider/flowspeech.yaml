@@ -19,9 +19,9 @@ credentials_for_provider:
       en_US: Enter your FlowSpeech API key
       zh_Hans: 输入 FlowSpeech API 密钥
     help:
-      en_US: Create an API key in your FlowSpeech account.
+      en_US: Create an API key with an active paid Basic, Pro or Scale subscription.
       zh_Hans: 在 FlowSpeech 账户中创建 API 密钥。
-    url: https://flowspeech.io/
+    url: https://flowspeech.io/settings/apikeys
 tools:
   - tools/text_to_speech.yaml
 extra:

@@ -10,3 +10,10 @@ __pycache__/
 tests/
 *.difypkg
 pyproject.toml
+dist/
+.tools/
+RELEASE.md
+VALIDATION.md
+scripts/
+.test-tmp/
+.artifact-test/

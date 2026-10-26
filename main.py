@@ -1,7 +1,9 @@
-from dify_plugin import DifyPluginEnv, Plugin
+from dify_plugin import Plugin
+
+from runtime_config import get_plugin_env
 
 
-plugin = Plugin(DifyPluginEnv(MAX_REQUEST_TIMEOUT=180))
+plugin = Plugin(get_plugin_env())
 
 
 if __name__ == "__main__":

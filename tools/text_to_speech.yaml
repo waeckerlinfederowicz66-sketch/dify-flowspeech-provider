@@ -12,12 +12,12 @@ description:
 parameters:
   - name: text
     type: string
-    required: true
+    required: false
     label:
       en_US: Text
       zh_Hans: 文本
     human_description:
-      en_US: Text to convert into speech. Plain-language emotion cues and pause tags are supported.
+      en_US: Text to convert into speech. Omit when using explicit segments.
       zh_Hans: 要转换为语音的文本，支持自然语言情绪提示和停顿标签。
     llm_description: The complete text to synthesize as speech.
     form: llm
@@ -93,6 +93,27 @@ parameters:
         label: { en_US: Achernar - soft and tender, zh_Hans: Achernar - 柔和细腻 }
       - value: Gacrux
         label: { en_US: Gacrux - mature and experienced, zh_Hans: Gacrux - 成熟稳重 }
+  - name: segments
+    type: string
+    required: false
+    label: { en_US: Speaker segments (JSON), zh_Hans: Speaker segments (JSON) }
+    human_description: { en_US: JSON array of speaker/text/voiceName turns, instead of text., zh_Hans: JSON array of speaker/text/voiceName turns. }
+    llm_description: Optional JSON array of speaker, text and voiceName objects. Do not also provide text.
+    form: llm
+  - name: request_id
+    type: string
+    required: false
+    label: { en_US: Request UUID, zh_Hans: Request UUID }
+    human_description: { en_US: Reuse only for an unchanged recording to recover an interrupted request., zh_Hans: Reuse only for an unchanged recording. }
+    llm_description: Optional UUID idempotency key. Never reuse it for changed text or voice.
+    form: form
+  - name: timeout
+    type: number
+    required: false
+    default: 300
+    label: { en_US: Total deadline (seconds), zh_Hans: Total deadline (seconds) }
+    human_description: { en_US: Requested total deadline; capped five seconds below MAX_REQUEST_TIMEOUT. Configure outer workflow limits accordingly., zh_Hans: Requested total deadline; capped five seconds below MAX_REQUEST_TIMEOUT. }
+    form: form
 extra:
   python:
     source: tools/text_to_speech.py
