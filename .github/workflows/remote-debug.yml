@@ -7,6 +7,8 @@ on:
     paths:
       - .github/workflows/remote-debug.yml
       - scripts/remote_debug/**
+      - scripts/deployed_ce/**
+      - scripts/verify_artifacts.py
 
 permissions:
   contents: read

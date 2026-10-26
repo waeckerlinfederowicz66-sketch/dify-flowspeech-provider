@@ -42,7 +42,13 @@ allow flowspeech.io and the result storage host (the manifest includes
 static.flowspeech.io). Confirm the deployed result host before release; the public
 contract intentionally does not guarantee a specific storage domain.
 
-No text, audio or credentials are persisted by the plugin. See PRIVACY.md.
+The plugin has no independent local store, but Dify may retain workflow inputs,
+outputs and persisted audio according to deployment settings. Text and speaker
+segments supplied by the workflow author may contain personal information and
+are sent to FlowSpeech without automatic redaction. See [plugin privacy details](PRIVACY.md),
+the [FlowSpeech Privacy Policy](https://flowspeech.io/privacy-policy) and the
+[public API documentation](https://flowspeech.io/docs/public-api) for service data
+handling, retention and result-link access.
 
 ## API v1 behavior
 

@@ -526,6 +526,8 @@ def test_cleanup_refuses_non_job_scope(monkeypatch, tmp_path, project):
 def test_workflow_bounded_read_only_staging_order_cleanup_and_upload_guards():
     workflow = yaml.load((ROOT / ".github/workflows/remote-debug.yml").read_text(), Loader=yaml.BaseLoader)
     assert workflow["permissions"] == {"contents": "read"}
+    paths = workflow["on"]["push"]["paths"]
+    assert "scripts/deployed_ce/**" in paths and "scripts/verify_artifacts.py" in paths
     job = workflow["jobs"]["remote-debug"]
     assert job["timeout-minutes"] == "30" and "runner." not in json.dumps(job["env"])
     steps = job["steps"]
