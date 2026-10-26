@@ -1,8 +1,42 @@
 # Validation: dify-flowspeech-provider 0.2.0
 
 Date: 2026-10-26. Final release-gate follow-up in an isolated migration checkout.
-Both source and actual final artifacts pass 188 tests (previous baseline 94).
-The final archives supersede all earlier local 0.2.0 candidates.
+The release artifact passes 188 tests (previous baseline 94). Current source also
+includes 24 offline tests of the new deployed-CE harness, for 212 source tests.
+The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
+
+## Prepared deployed CE gate (not executed)
+
+`.github/workflows/deployed-ce.yml` and `scripts/deployed_ce/` provide one bounded
+40-minute GitHub-hosted job. It uses digest-pinned CE 1.18.0, the real 0.6.10-local
+Go daemon, PostgreSQL and Redis. It installs the unchanged reviewed package through
+CE, validates provider credentials, runs start/tool/end workflows, retrieves the
+persisted WAV, and checks real 200-second completion and a 180-second host deadline.
+Malformed audio, redirect refusal, credential-free downloads and no resubmission
+are checked through the deployed workflow rather than an SDK shim.
+
+All deployed containers are on an internal network, with no published ports.
+Dependencies are staged as wheels and installed offline. Fixed API/storage hosts
+resolve to an HTTPS fixture; a disposable CA is added only to the isolated
+runtime's certifi trust bundle. Installed plugin Python bytes are compared with
+the reviewed package. No plugin source or clocks are changed. This trust setup
+and test-only acceptance of an unsigned package are explicitly disclosed limits.
+
+Local checks: 212 source tests passed (2.44s), including 24 new offline harness
+checks; the unchanged extracted package passed its 188 runtime tests (2.32s).
+The development-only harness tests are excluded from that package run.
+Byte-compilation and package audit passed. These are not deployed results.
+No Docker runtime is installed here and no workflow was pushed or dispatched.
+The first real CI run still must verify Compose rendering, startup/migrations,
+installation, credentials, workflow routing, persisted output and real deadlines.
+See `scripts/deployed_ce/README.md` for coordinator commands and retained evidence.
+
+PR 3513 was verified open and draft. Cloud remains unvalidated: it requires an
+authorized installation/workflow workspace plus platform-controlled mock routing
+and certificate trust for the fixed HTTPS hostnames. A CE pass does not close this
+gate or validate an external reverse proxy, production storage, or other versions.
+Keep the PR draft pending actual deployed evidence and explicit handling of the
+Cloud limitation. No underlying production service or paid generation was called.
 
 ## Commands and results
 

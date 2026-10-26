@@ -1,0 +1,146 @@
+"""Offline checks of the deployed CE harness, not evidence of a deployed platform."""
+import hashlib
+import io
+import json
+from pathlib import Path
+import uuid
+import wave
+
+import pytest
+import yaml
+
+from scripts.deployed_ce.collect import redact
+from scripts.deployed_ce.driver import file_url, graph, terminal_event
+from scripts.deployed_ce.mock_http import State, fixture_wav
+
+ROOT = Path(__file__).resolve().parents[1]
+GATE = ROOT / "scripts" / "deployed_ce"
+KEY = "isolated-fixture-credential"
+REQUEST_ID = "11111111-1111-4111-8111-111111111111"
+
+
+def create(state):
+    body = json.dumps({"input": {"mode": "single", "text": "CE fixture " + state.case, "voiceName": "Kore"}}).encode()
+    return state.handle("POST", "flowspeech.io", "/api/v1/tts/jobs",
+                        {"Authorization": "Bearer " + KEY, "Idempotency-Key": REQUEST_ID}, body)
+
+
+def test_fixture_wav_is_real_mono_pcm():
+    with wave.open(io.BytesIO(fixture_wav())) as wav:
+        assert (wav.getframerate(), wav.getnchannels(), wav.getsampwidth(), wav.getnframes()) == (24000, 1, 2, 9000)
+
+
+def test_mock_holds_job_for_200_seconds_without_fake_sdk():
+    now = [100.0]
+    state = State(KEY, clock=lambda: now[0])
+    state.configure("slow", 200)
+    status, _, job = create(state)
+    assert status == 202 and job["status"] == "queued" and job["requestId"] == REQUEST_ID
+    now[0] += 199.9
+    assert state.job(job["id"])["result"] is None
+    now[0] += 0.1
+    assert state.job(job["id"])["status"] == "success"
+    assert state.job(job["id"])["result"]["url"].startswith("https://static.flowspeech.io/")
+
+
+@pytest.mark.parametrize("headers", [{"Authorization": "Bearer " + KEY}, {"Cookie": "session=fixture"}])
+def test_mock_storage_rejects_credentials(headers):
+    status, _, _ = State(KEY).handle("GET", "static.flowspeech.io", "/audio/fixture.wav", headers, b"")
+    assert status == 403
+
+
+def test_credential_validation_never_creates_audio():
+    state = State(KEY)
+    assert state.handle("GET", "flowspeech.io", "/api/v1/quota", {}, b"")[0] == 401
+    assert state.handle("GET", "flowspeech.io", "/api/v1/quota", {"Authorization": "Bearer " + KEY}, b"")[0] == 200
+    assert not state.jobs
+
+
+@pytest.mark.parametrize("case", ["api-redirect", "audio-redirect", "malformed", "deadline"])
+def test_negative_mock_cases(case):
+    state = State(KEY)
+    state.configure(case, 200 if case == "deadline" else 0)
+    status, headers, job = create(state)
+    if case == "api-redirect":
+        assert status == 302 and "Location" in headers and not state.jobs
+    elif case == "deadline":
+        assert job["status"] == "queued"
+    else:
+        status, headers, body = state.handle("GET", "static.flowspeech.io", "/audio/fixture.wav", {}, b"")
+        assert status == (302 if case == "audio-redirect" else 200)
+        if case == "malformed":
+            assert not body.startswith(b"RIFF")
+
+
+@pytest.mark.parametrize("url", ["https://flowspeech.io/files/a", "http://evil.test/files/a",
+                                  "http://user@api:5001/files/a", "http://api:5001/console/api/setup", "//evil.test/a"])
+def test_driver_refuses_nonlocal_file_downloads(url):
+    with pytest.raises(ValueError):
+        file_url(url)
+
+
+def test_driver_allows_only_ce_file_service():
+    assert file_url("/files/tools/a.wav?sign=fixture") == "http://api:5001/files/tools/a.wav?sign=fixture"
+
+
+def test_real_workflow_has_no_model_or_code_nodes():
+    payload = graph("basic", REQUEST_ID, 300)
+    assert [node["data"]["type"] for node in payload["nodes"]] == ["start", "tool", "end"]
+    tool = payload["nodes"][1]["data"]
+    assert tool["provider_id"] == "flowspeech/flowspeech/flowspeech"
+    assert tool["tool_name"] == "flowspeech_text_to_speech"
+    assert tool["tool_configurations"]["request_id"] == str(uuid.UUID(REQUEST_ID))
+    assert len(payload["edges"]) == 2
+
+
+@pytest.mark.parametrize("lines", [[], [b'data: {"event":"error"}\n'],
+                                   [b'data: {"event":"workflow_finished","data":{"status":"failed"}}\n']])
+def test_partial_or_failed_workflow_cannot_pass(lines):
+    with pytest.raises(AssertionError):
+        terminal_event(lines)
+
+
+def test_sse_terminal_and_heartbeat():
+    assert terminal_event([b": ping\n", b'data: {"event":"workflow_finished","data":{"status":"succeeded","outputs":{}}}\n'])["outputs"] == {}
+
+
+def test_compose_fails_closed_and_pins_every_image():
+    compose = yaml.safe_load((GATE / "compose.yaml").read_text())
+    pins = json.loads((GATE / "pins.json").read_text())
+    assert compose["networks"] == {"gate": {"internal": True}}
+    for service in compose["services"].values():
+        assert service["image"] in pins["images"].values()
+        assert "@sha256:" in service["image"]
+        assert not service.get("ports") and not service.get("privileged")
+        assert service.get("network_mode") == "none" or set(service["networks"]) == {"gate"}
+    daemon = compose["services"]["plugin_daemon"]["environment"]
+    assert "--no-index" in daemon["PIP_EXTRA_ARGS"]
+    assert daemon["PIP_MIRROR_AUTO_DETECT"] == "false"
+    assert compose["services"]["mock"]["networks"]["gate"]["aliases"] == ["flowspeech.io", "static.flowspeech.io"]
+
+
+def test_workflow_has_bounded_read_only_permissions_and_no_secret_upload():
+    # BaseLoader preserves YAML's 'on' key instead of YAML 1.1 boolean coercion.
+    workflow = yaml.load((ROOT / ".github/workflows/deployed-ce.yml").read_text(), Loader=yaml.BaseLoader)
+    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["jobs"]["deployed-ce"]["timeout-minutes"] == "40"
+    steps = workflow["jobs"]["deployed-ce"]["steps"]
+    upload = next(step for step in steps if "upload-artifact@" in step.get("uses", ""))
+    assert upload["with"]["path"].endswith("/evidence/")
+    assert "steps.evidence.outcome == 'success'" in upload["if"]
+    assert not any("secrets." in json.dumps(step) for step in steps)
+
+
+def test_log_redaction_does_not_retain_generated_auth():
+    secret = "never-retain-this-fixture-value"
+    text = "Authorization: Bearer " + secret + "\nCookie: test=private\n" + secret
+    result = redact(text, [secret])
+    assert secret not in result and "test=private" not in result
+
+
+def test_reviewed_package_hash_is_pinned():
+    pins = json.loads((GATE / "pins.json").read_text())
+    package = ROOT / "dist/flowspeech-0.2.0.difypkg"
+    if package.exists():
+        assert hashlib.sha256(package.read_bytes()).hexdigest() == pins["package_sha256"]
+    assert "/45c04d1b0ad75206ac5c3efb9cfc7f5685d845ac/" in pins["package_url"]

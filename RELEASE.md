@@ -1,5 +1,25 @@
 # Release 0.2.0
 
+## Current deployed-validation handoff
+
+Marketplace update PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
+is open and draft. Do not mark deployed CE or Cloud validation complete based on
+the SDK/source suites. The new `Deployed CE release gate` workflow is prepared,
+not executed. Its 24 offline harness checks pass within the 212-test source suite.
+The reviewed 125757-byte package remains unchanged at SHA-256
+`ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
+
+Coordinator: review and push the scoped workflow, harness, test and report changes
+to `codex/public-api-v1`; that push triggers the first bounded CE job. No secret
+configuration is needed. Follow `scripts/deployed_ce/README.md` for exact run/watch/
+download commands, failure evidence, cleanup and the separate Cloud access gate.
+The workstation has no container runtime; no deployed pass is claimed locally.
+Do not expand this first run to paid APIs, external deployments or browser sessions.
+
+Before a new commit, verify local `user.email` is
+`waeckerlinfederowicz66@gmail.com`. Preserve user.name, global configuration and
+published history. The worker does not push or dispatch CI.
+
 ## Coordinator steps
 
 1. Review the changed source and VALIDATION.md; no user changes existed initially.
@@ -24,8 +44,8 @@ merge_commit_sha=e815a9ec4182159a2fab8ed973288cfe589c63fe.
 Its original head was waeckerlinfederowicz66-sketch/dify-plugins:add-flowspeech-plugin.
 
 Do not claim #3008 is pending or try to update it as an open submission.
-The coordinator should follow the current Marketplace version-update process,
-referencing the merged original. No 0.2.0 Marketplace submission has been created.
+The coordinator followed the Marketplace version-update process in draft PR
+3513, referencing the merged original. The deployment release gate is still open.
 
 ## Packaging tool provenance
 

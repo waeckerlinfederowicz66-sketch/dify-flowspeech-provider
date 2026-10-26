@@ -1,0 +1,92 @@
+name: Deployed CE release gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/public-api-v1]
+    paths:
+      - .github/workflows/deployed-ce.yml
+      - scripts/deployed_ce/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployed-ce-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deployed-ce:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    env:
+      GATE_STATE: ${{ runner.temp }}/flowspeech-ce-gate
+      COMPOSE_PROJECT_NAME: flowspeech-ce-${{ github.run_id }}-${{ github.run_attempt }}
+      GATE_HOST_TIMEOUT: '300'
+      PYTHON_IMAGE: python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fetch the exact reviewed candidate and prepare disposable settings
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          mkdir -p "$GATE_STATE"
+          url=$(python3 -c 'import json; print(json.load(open("scripts/deployed_ce/pins.json"))["package_url"])')
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 2 --max-time 60 "$url" -o "$GATE_STATE/candidate.difypkg"
+          python3 scripts/deployed_ce/prepare.py "$GATE_STATE"
+          python3 scripts/verify_artifacts.py "$GATE_STATE/candidate.difypkg" > "$GATE_STATE/evidence/package-audit.json"
+      - name: Stage binary dependencies outside the isolated deployment
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          docker pull "$PYTHON_IMAGE"
+          docker run --rm -v "$PWD/requirements.txt:/requirements.txt:ro" -v "$GATE_STATE/wheels:/wheels" "$PYTHON_IMAGE" python -m pip download --only-binary=:all: -r /requirements.txt -d /wheels
+          docker compose -f scripts/deployed_ce/compose.yaml pull
+      - name: Start real CE services with no external network or host ports
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          docker compose -f scripts/deployed_ce/compose.yaml up -d db redis mock api worker plugin_daemon
+          python3 scripts/deployed_ce/check_isolation.py
+      - name: Install package through CE and trust only the fixture CA
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          docker compose -f scripts/deployed_ce/compose.yaml run --rm driver python /gate/driver.py install
+          docker compose -f scripts/deployed_ce/compose.yaml exec -T plugin_daemon python3 /gate/trust_fixture.py > "$GATE_STATE/evidence/runtime-identity.json"
+      - name: Validate real workflows including 200-second completion
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          docker compose -f scripts/deployed_ce/compose.yaml run --rm driver python /gate/driver.py run
+      - name: Validate the 180-second host budget through the deployed daemon
+        timeout-minutes: 5
+        env:
+          GATE_HOST_TIMEOUT: '180'
+        run: |
+          set -euo pipefail
+          docker compose -f scripts/deployed_ce/compose.yaml up -d plugin_daemon
+          python3 scripts/deployed_ce/check_isolation.py
+          docker compose -f scripts/deployed_ce/compose.yaml run --rm driver python /gate/driver.py short-host
+      - name: Collect redacted evidence
+        id: evidence
+        if: always()
+        timeout-minutes: 2
+        run: python3 scripts/deployed_ce/collect.py
+      - name: Remove only this job's containers and volumes
+        if: always()
+        timeout-minutes: 2
+        run: docker compose -f scripts/deployed_ce/compose.yaml down --volumes --remove-orphans
+      - name: Retain only sanitized validation evidence
+        if: always() && steps.evidence.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dify-ce-validation-${{ github.run_id }}
+          path: ${{ runner.temp }}/flowspeech-ce-gate/evidence/
+          if-no-files-found: error
+          retention-days: 7

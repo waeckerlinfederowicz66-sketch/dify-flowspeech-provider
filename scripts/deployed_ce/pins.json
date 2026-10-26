@@ -1,0 +1,16 @@
+{
+  "dify_version": "1.18.0",
+  "dify_commit": "50abea97062110044f15d0e03ccecadd9ccc87ca",
+  "daemon_version": "0.6.10-local",
+  "daemon_commit": "1310a18b2f6bc6f18768a0a6265484830891433c",
+  "graphon_commit": "4fa22141774dff80e90e4dfa98ea3e6fbf0421bb",
+  "package_url": "https://raw.githubusercontent.com/waeckerlinfederowicz66-sketch/dify-plugins/45c04d1b0ad75206ac5c3efb9cfc7f5685d845ac/flowspeech/flowspeech/flowspeech-0.2.0.difypkg",
+  "package_sha256": "ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384",
+  "images": {
+    "api": "langgenius/dify-api:1.18.0@sha256:0120970fb4ea59aa328d63b7dda635cccc071efb8aae470cd07115a026dbffd3",
+    "daemon": "langgenius/dify-plugin-daemon:0.6.10-local@sha256:34412a22d1e1d1a6c73727fef88cffbcdd9be7a21bf9ad3076b4bf5c1b88fd9b",
+    "python": "python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
+    "postgres": "postgres:15-alpine@sha256:a8e042598834300dfaa17a54f695b87b7f25d3490433bbbe2ef3bffbb9747f24",
+    "redis": "redis:6-alpine@sha256:592b215e9287182f11ba9d7c229dc0ba312bb900a016ea65ae378b0127567319"
+  }
+}
