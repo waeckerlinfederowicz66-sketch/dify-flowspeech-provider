@@ -1,11 +1,12 @@
 # Deployed CE Release Gate
 
-This deployed-platform gate is **not yet passed**. Run 40323882509 passed isolation,
-installation and every main-stage case, including real 200.382-second completion,
-both audio redirects and the requested deadline. The 180-second host stage raced
-daemon restart: metadata was ready before the plugin process. A bounded quota-only
-dispatch probe now precedes that stage; it and the actual host deadline still need
-CI validation. See VALIDATION.md for audited timings and persisted-file hashes.
+The complete defined **isolated headless CE gate passed** in
+[run 40326427753](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40326427753)
+at head 4ff46caacca3abfbe7615f6099009baf6c42ce4e. Slow completion took 200.301s;
+after a 3.103s quota-only restart probe, host 180/tool 175 returned recovery at
+170.257s with one submission and no audio. All other cases, exact persisted WAV
+hashes, credential-free downloads and both isolation checks passed. The retained
+summary has ce_passed=true and cloud_passed=false; see VALIDATION.md for the full audit.
 Keep Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 draft until the coordinator reviews actual CI evidence and the Cloud limitation.
 
@@ -91,15 +92,13 @@ artifact upload. Settings, credentials, CA private keys, cookies, wheels, databa
 volumes, and raw workflow responses are never uploaded. Cleanup removes only this
 job's Compose project and volumes; artifacts expire after seven days.
 
-## Exact Remaining Gates
+## Scope and Remaining Gates
 
-1. This workstation has no Docker/Podman/Colima. Source and offline harness tests
-   pass. CI passed startup, isolation, installation and all main-stage cases,
-   including file hashes, real 200-second completion, both audio redirects and
-   the short requested deadline. Restart readiness and the 180-second daemon
-   stage still require another CI run. An
-   integration failure is a failed gate, not an SDK-only substitute.
-2. Even a passing run covers this headless CE configuration only. It does not
+1. This workstation has no Docker/Podman/Colima. The CE pass is from the real
+   GitHub-hosted deployment, including the post-restart 180-second stage, not
+   the source/SDK simulations. An integration failure in a future run must still
+   fail the gate; do not substitute an SDK-only check.
+2. This passing run covers the pinned headless CE configuration only. It does not
    validate the web UI, a separately deployed reverse proxy, actual production
    storage overrides, other CE versions, or Dify Cloud's managed policies.
 3. Cloud needs a reviewer-authorized workspace with plugin-install/workflow

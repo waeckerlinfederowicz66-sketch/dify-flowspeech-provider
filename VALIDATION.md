@@ -5,7 +5,83 @@ The release artifact passes 188 tests (previous baseline 94). Current source als
 includes 112 offline tests of the deployed-CE harness, for 300 source tests.
 The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
 
-## Deployed CE gate (main cases passed; short-host pending)
+## Deployed CE gate passed (isolated headless CE only)
+
+[CI run 40326427753](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40326427753)
+completed successfully at exact head 4ff46caacca3abfbe7615f6099009baf6c42ce4e.
+Every job step passed, including daemon restart, short-host validation, redacted
+evidence collection and project/volume cleanup. All nine retained evidence files
+were audited. summary.json reports **ce_passed=true, cloud_passed=false**, with
+isolation, install, run and short-host each passed.
+
+Evidence archive: dify-ce-validation-40326427753, artifact ID 12651777580,
+24549 bytes. Verified SHA-256:
+497be24f760c90d5326652582dc3ad8af74831cb92190a5001f83c4dfcd3d7a9.
+The archive contains only install.json, isolation.json, package-audit.json,
+pins.json, run.json, runtime-identity.json, service-logs.txt, short-host.json and
+summary.json. The retained pins match the repository exactly: CE 1.18.0 and
+daemon 0.6.10-local, with digest-pinned images and 36 recorded wheel hashes.
+
+| Case | Actual elapsed | Creates / polls / downloads | Verified result |
+| --- | --- | --- | --- |
+| Provider credentials | not timed | quota-only validation | Invalid rejected; valid saved |
+| Basic | 18.405s | 1 / 1 / 1 | One persisted WAV and recovery IDs |
+| Slow, host 300/tool 295 | 200.301s | 1 / 40 / 1 | One persisted WAV and recovery IDs |
+| Malformed WAV | 5.108s | 1 / 1 / 1 | Recovery IDs; no audio output |
+| API redirect | 0.102s | 1 / 0 / 0 | Rejected; forbidden target not reached |
+| Unsafe audio redirect | 5.122s | 1 / 1 / 1 | Rejected; forbidden target not reached |
+| Safe HTTPS audio redirect | 5.148s | 1 / 1 / 2 | Both hops credential-free; one WAV |
+| Requested timeout 10s | 5.105s | 1 / 1 / 0 | Recovery IDs before deadline; no audio |
+| Post-restart readiness | 3.103s | 0 creates; 1 quota GET | Invalid rejected on attempt 2 |
+| Host 180/tool 175 | 170.257s | 1 / 34 / 0 | Recovery IDs before both limits; no audio |
+
+The 180-second case requested 300 seconds against a job delayed 200 seconds.
+Daemon recreation with GATE_HOST_TIMEOUT=180 is recorded in the CI log. Runtime
+readiness occurs before, and is excluded from, the measured workflow interval.
+The observed 170.257 seconds is below the unchanged 175-second tool cap and
+180-second host response limit, with no retry or second submission. Returning
+before the next five-second poll would exceed the deadline is expected behavior.
+
+Basic, slow and safe-redirect each persisted exactly one 18044-byte PCM WAV.
+The driver downloaded all three through CE's file service, compared every byte
+with the fixture, and retained each computed SHA-256. All three equal:
+ef2b9384c28fa5e94babe9397b3c7201393c4fe9b7e4c39c0683a3f944b2e7ad.
+The installed package is 125757 bytes/17 members, SHA-256:
+ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384.
+All eight installed Python files match the archive; plugin_code_changed=false.
+
+Security/network audit: every workflow has exactly one submission attempt; all
+storage hops, including the cross-host redirect, have authorization_present=false
+and cookie_present=false. No forbidden redirect target was requested. Slow-job
+minimum poll interval is 5.003937s; short-host minimum is 5.004033s. Startup and
+post-restart isolation checks both passed. The seven persistent containers use
+only the job-scoped internal network, except init-storage in network mode none.
+Compose also places the ephemeral driver only on that internal network. No host
+ports, privileged containers or Docker sockets are exposed. Fixed API/storage
+hostnames resolve to the internal HTTPS mock; images/wheels are staged before
+deployment, so this does not claim the entire GitHub runner is offline.
+
+Service-log startup errors correspond to the first readiness probe; the next
+probe reaches quota and rejects the invalid fixture credential. This was followed
+by the successful single deadline workflow. Sanitized diagnostics were collected
+successfully and the job network and all three volumes were removed. Settings,
+credentials, private CA keys and database contents are not in the artifact.
+
+**Scope:** the complete defined gate passed on this disposable, headless CE
+configuration with the real API, worker, Go daemon and unchanged package. Dify
+Cloud, production generation/storage, browser/UI, external reverse proxies,
+other versions and managed egress policies remain unvalidated. No paid API was
+used. The fixture CA and test-only unsigned-package acceptance do not prove
+production trust or Marketplace signature acceptance. PR 3513 remains draft;
+the coordinator owns review of Marketplace comments and the unresolved Cloud
+scope. No PR state, public comment, push or publication was performed here.
+
+Post-audit local checks: 300 source tests passed (2.53s), extracted original package
+188 passed (2.27s), with the same two SDK warnings. Both workflows pass actionlint
+1.7.7; package audit and git diff checks pass. This update changes documentation
+only, not the tested harness, runtime source or reviewed package.
+
+### Previous daemon-readiness failure
 
 [CI run 40323882509](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40323882509)
 ran exact head 23da25ba8ac71a94c5cec3c775cec1765a6e69ae. Isolation, real installation
@@ -58,8 +134,8 @@ Current local results: 112 harness tests passed (0.15s), 300 source tests passed
 warnings in full/runtime suites. Eighteen new regressions cover startup retries,
 deadline exhaustion, quota-only proof, auth denial, unexpected HTTP/TLS/redirect
 errors and ordering before the sole measured generation. Both workflows pass
-actionlint 1.7.7, package audit and git diff checks pass. The fix still needs CI;
-complete CE validation is not claimed. Cloud remains unvalidated and PR 3513 draft.
+actionlint 1.7.7, package audit and git diff checks passed. At that handoff the fix
+still needed CI; the later successful run is recorded above. Cloud remains unvalidated.
 
 ### Previous redirect-fixture failure
 
@@ -231,16 +307,16 @@ the reviewed package. No plugin source or clocks are changed. This trust setup
 and test-only acceptance of an unsigned package are explicitly disclosed limits.
 
 No Docker runtime is installed here and this worker did not push or dispatch CI.
-Later runs passed isolation, installation, credentials and several workflows as
-recorded above; the remaining redirect/deadline cases keep the full gate open.
+Subsequent runs resolved these integration failures; the complete defined CE gate
+passed in run 40326427753 as recorded above. Cloud is still outside that evidence.
 See `scripts/deployed_ce/README.md` for coordinator commands and retained evidence.
 
 PR 3513 was verified open and draft. Cloud remains unvalidated: it requires an
 authorized installation/workflow workspace plus platform-controlled mock routing
 and certificate trust for the fixed HTTPS hostnames. A CE pass does not close this
 gate or validate an external reverse proxy, production storage, or other versions.
-Keep the PR draft pending actual deployed evidence and explicit handling of the
-Cloud limitation. No underlying production service or paid generation was called.
+Keep the PR draft pending coordinator review of the deployed CE evidence and
+explicit handling of the Cloud limitation. No production service or paid generation was called.
 
 ## Commands and results
 
@@ -319,8 +395,8 @@ email, pushes or publication were made by this worker. Validation changes are
 committed locally for coordinator review; no OIDC or authentication changes were
 made. Public asset, Marketplace and CI reads were used for release verification.
 Existing changes were preserved.
-No production generation or complete deployed Dify pass is claimed. Partial CE
-evidence is limited to the completed cases identified at the top of this report.
+No production generation, Cloud or browser validation is claimed. The complete
+defined CE gate pass is limited to the isolated configuration and cases above.
 A single in-flight HTTP request may finish cleanup after the local caller deadline;
 it cannot submit a retry or another recording. Recover accepted jobs with their
 original request/job UUID instead of submitting new input.
@@ -341,7 +417,7 @@ error without audio or a second POST. No heartbeat workaround is used.
 
 The rebuilt package includes runtime_config.py. Actual SDK entrypoints and the
 intended result hostname are verified below. These SDK-only checks did not establish
-installation; the later partial CE evidence is recorded at the top of this report.
+installation; the later complete defined CE gate evidence is recorded above.
 
 ## Runtime and egress follow-up
 

@@ -2,30 +2,41 @@
 
 ## Current deployed-validation handoff
 
-Marketplace update PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
-is open and draft. Do not mark deployed CE or Cloud validation complete based on
-the SDK/source suites. Its 112 offline harness checks pass within the 300-test source
-suite; the unchanged package passes 188 tests. Both workflows pass actionlint.
-Run [40323882509](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40323882509)
-passed isolation, installation and all main cases: credential rejection/save,
-persisted WAV, real 200.382-second completion, malformed audio, API/unsafe-audio
-redirect rejection, safe credential-free HTTPS redirect and short requested deadline.
-All three persisted WAV hashes match. The 180-second stage failed immediately after
-daemon recreation because installed metadata was available before the plugin process.
-A bounded, quota-only invalid-credential dispatch probe now waits for that actual
-runtime before the sole measured generation. It does not relax auth denial, network
-isolation, no-resubmission, host 180/tool 175 or the 160-to-180-second assertion.
-The restart-readiness fix and host deadline still require CI. Cloud is unvalidated;
-Marketplace remains draft pending that scope decision and complete CE evidence.
-See VALIDATION.md for audited partial results, artifact hashes and remaining limits.
+The complete defined **isolated headless CE gate passed** in
+[run 40326427753](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40326427753),
+exact head 4ff46caacca3abfbe7615f6099009baf6c42ce4e. All nine retained files were
+audited: summary.json has ce_passed=true, cloud_passed=false. Artifact ID
+12651777580, 24549 bytes, SHA-256:
+`497be24f760c90d5326652582dc3ad8af74831cb92190a5001f83c4dfcd3d7a9`.
+
+Actual slow completion: 200.301s with host 300/tool 295. After real daemon restart,
+quota-only readiness took 3.103s; host 180/tool 175 returned recovery at 170.257s,
+with one submission, 34 polls, no download and no audio. Credentials, malformed
+WAV, both negative redirects, safe HTTPS redirect, requested deadline and file
+persistence all passed. Every storage hop was free of Authorization/cookies;
+all workflow submissions were single attempts, with no forbidden target reached.
+Both isolation checks passed with only internal/no-network containers and no
+published ports. The package and its eight installed Python files are unchanged.
+Three persisted 18044-byte WAV files have the identical SHA-256:
+`ef2b9384c28fa5e94babe9397b3c7201393c4fe9b7e4c39c0683a3f944b2e7ad`.
+
+The 112 offline harness checks pass within 300 source tests; the package passes
+188 tests. These support but do not replace the actual deployed evidence above.
+See VALIDATION.md for every case timing and audit detail. This pass covers only
+the pinned CE 1.18.0/daemon 0.6.10-local configuration. Cloud, production services,
+browser/UI, external proxies and managed egress policies remain unvalidated.
+No paid API was used. Fixture-CA trust and unsigned-package acceptance are test-only.
+Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513) remains
+draft pending the coordinator's review of Marketplace comments and Cloud scope.
 The reviewed 125757-byte package remains unchanged at SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
 
-Coordinator: review and push the scoped workflow, harness, test and report changes
-to `codex/public-api-v1`; that push triggers the next bounded CE job. No secret
-configuration is needed. Follow `scripts/deployed_ce/README.md` for exact run/watch/
-download commands, failure evidence, cleanup and the separate Cloud access gate.
-The workstation has no container runtime; no deployed pass is claimed locally.
+Coordinator: review and push this documentation-only evidence update. No rebuild
+or package replacement is needed. The harness README is within the current CE
+workflow path filter, so pushing its update can trigger another bounded run.
+The workstation has no container runtime; the deployed pass is from the audited
+GitHub-hosted job, not a local simulation. See `scripts/deployed_ce/README.md` for
+reproduction commands and the separate Cloud access gate.
 Do not expand this gate to paid APIs, external deployments or browser sessions.
 
 Before a new commit, verify local `user.email` is
