@@ -2,10 +2,24 @@
 
 Date: 2026-10-26. Final release-gate follow-up in an isolated migration checkout.
 The release artifact passes 188 tests (previous baseline 94). Current source also
-includes 24 offline tests of the new deployed-CE harness, for 212 source tests.
+includes 25 offline tests of the new deployed-CE harness, for 213 source tests.
 The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
 
 ## Prepared deployed CE gate (not executed)
+
+The first [CI attempt, 40307156979](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40307156979),
+was rejected during workflow validation before any jobs or containers started.
+The run-page annotation identifies line 23, column 19: the runner context is not
+available in job-level env. GATE_STATE is now initialized in the first step using
+RUNNER_TEMP and GITHUB_ENV; step-level artifact paths retain their valid context.
+The regression executes that step with a temporary path containing spaces.
+
+Pinned actionlint 1.7.7 reproduces the original context error and passes both
+corrected workflows (shellcheck and pyflakes integrations disabled). Its Darwin
+arm64 archive was checked against the official release checksums before execution:
+2693315b9093aeacb4ebd91a993fea54fc215057bf0da2659056b4bc033873db.
+The corrected source suite passes 213 tests with the same two SDK warnings.
+This repairs workflow admission only; deployed CE and Cloud remain unvalidated.
 
 `.github/workflows/deployed-ce.yml` and `scripts/deployed_ce/` provide one bounded
 40-minute GitHub-hosted job. It uses digest-pinned CE 1.18.0, the real 0.6.10-local

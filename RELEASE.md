@@ -5,7 +5,10 @@
 Marketplace update PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 is open and draft. Do not mark deployed CE or Cloud validation complete based on
 the SDK/source suites. The new `Deployed CE release gate` workflow is prepared,
-not executed. Its 24 offline harness checks pass within the 212-test source suite.
+not executed. Its 25 offline harness checks pass within the 213-test source suite.
+The first CI attempt failed workflow validation before scheduling any jobs;
+the invalid job-level runner context has been moved to step-time initialization.
+Both workflows now pass actionlint, but real deployment still requires another run.
 The reviewed 125757-byte package remains unchanged at SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
 

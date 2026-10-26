@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import subprocess
 import uuid
 import wave
 
@@ -129,6 +130,20 @@ def test_workflow_has_bounded_read_only_permissions_and_no_secret_upload():
     assert upload["with"]["path"].endswith("/evidence/")
     assert "steps.evidence.outcome == 'success'" in upload["if"]
     assert not any("secrets." in json.dumps(step) for step in steps)
+
+
+def test_state_path_is_initialized_at_step_runtime(tmp_path):
+    workflow = yaml.load((ROOT / ".github/workflows/deployed-ce.yml").read_text(), Loader=yaml.BaseLoader)
+    job = workflow["jobs"]["deployed-ce"]
+    assert "GATE_STATE" not in job["env"]
+    assert "runner." not in json.dumps(job["env"])
+    initialize = job["steps"][0]
+    env_file = tmp_path / "github-env"
+    runner_temp = tmp_path / "runner temp with spaces"
+    subprocess.run(["bash", "-eu", "-c", initialize["run"]], check=True,
+                   env={"RUNNER_TEMP": str(runner_temp), "GITHUB_ENV": str(env_file)})
+    assert env_file.read_text() == f"GATE_STATE={runner_temp}/flowspeech-ce-gate\n"
+    assert "actions/checkout@" in job["steps"][1]["uses"]
 
 
 def test_log_redaction_does_not_retain_generated_auth():
