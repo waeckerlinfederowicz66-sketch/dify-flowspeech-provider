@@ -1,0 +1,151 @@
+name: flowspeech-remote-gate
+
+x-api: &api
+  image: langgenius/dify-api:1.18.0@sha256:0120970fb4ea59aa328d63b7dda635cccc071efb8aae470cd07115a026dbffd3
+  env_file: ${GATE_STATE:?Set GATE_STATE}/runtime.env
+  networks: [gate]
+  volumes: [app-storage:/app/api/storage]
+  depends_on:
+    init-storage:
+      condition: service_completed_successfully
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  mem_limit: 2g
+
+x-runtime: &runtime
+  image: python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+  profiles: [validation]
+  volumes:
+    - ../:/scripts:ro
+    - ${GATE_STATE:?Set GATE_STATE}/plugin:/plugin:ro
+    - ${GATE_STATE:?Set GATE_STATE}/candidate.difypkg:/candidate.difypkg:ro
+    - ${GATE_STATE:?Set GATE_STATE}/wheels:/wheels:ro
+    - ${GATE_STATE:?Set GATE_STATE}/ca.crt:/fixture-ca.crt:ro
+    - ${GATE_STATE:?Set GATE_STATE}/remote-key:/remote-key:ro
+    - ${GATE_STATE:?Set GATE_STATE}/evidence:/evidence
+    - remote-runtime:/runtime
+  mem_limit: 512m
+
+services:
+  init-storage:
+    image: python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+    command: [python, -c, "import os; os.chmod('/storage', 0o777)"]
+    network_mode: none
+    volumes: [app-storage:/storage]
+
+  db:
+    image: postgres:15-alpine@sha256:a8e042598834300dfaa17a54f695b87b7f25d3490433bbbe2ef3bffbb9747f24
+    env_file: ${GATE_STATE:?Set GATE_STATE}/runtime.env
+    networks: [gate]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ../deployed_ce/init-db.sql:/docker-entrypoint-initdb.d/gate.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d dify"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    mem_limit: 512m
+
+  redis:
+    image: redis:6-alpine@sha256:592b215e9287182f11ba9d7c229dc0ba312bb900a016ea65ae378b0127567319
+    command: [redis-server, --save, "", --appendonly, "no"]
+    networks: [gate]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    mem_limit: 128m
+
+  api:
+    <<: *api
+    environment:
+      MODE: api
+      MIGRATION_ENABLED: "true"
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:5001/health]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  worker:
+    <<: *api
+    environment:
+      MODE: worker
+      MIGRATION_ENABLED: "false"
+      CELERY_WORKER_CONCURRENCY: "1"
+      CELERY_WORKER_POOL: gevent
+    depends_on:
+      api:
+        condition: service_healthy
+
+  plugin_daemon:
+    image: langgenius/dify-plugin-daemon:0.6.10-local@sha256:34412a22d1e1d1a6c73727fef88cffbcdd9be7a21bf9ad3076b4bf5c1b88fd9b
+    env_file: ${GATE_STATE:?Set GATE_STATE}/runtime.env
+    environment:
+      DB_DATABASE: dify_plugin
+      MAX_REQUEST_TIMEOUT: "300"
+      FORCE_VERIFYING_SIGNATURE: "true"
+      PIP_MIRROR_AUTO_DETECT: "false"
+      PIP_EXTRA_ARGS: "--no-index"
+    networks: [gate]
+    volumes: [plugin-storage:/app/storage]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 1g
+
+  mock:
+    image: python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+    command: [python, /scripts/deployed_ce/mock_http.py]
+    networks:
+      gate:
+        aliases: [flowspeech.io, static.flowspeech.io]
+    volumes:
+      - ../:/scripts:ro
+      - ${GATE_STATE:?Set GATE_STATE}/fixture.json:/fixture.json:ro
+      - ${GATE_STATE:?Set GATE_STATE}/ca.crt:/fixture-ca.crt:ro
+      - ${GATE_STATE:?Set GATE_STATE}/ca.key:/fixture-ca.key:ro
+    mem_limit: 128m
+
+  stage-runtime:
+    <<: *runtime
+    network_mode: none
+    command: [python, /scripts/remote_debug/runtime.py, stage]
+
+  remote_plugin:
+    <<: *runtime
+    networks: [gate]
+    command: [python, /scripts/remote_debug/runtime.py, launch]
+    restart: "no"
+    stop_grace_period: 10s
+
+  driver:
+    image: python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+    profiles: [validation]
+    command: [python, -m, scripts.remote_debug.driver, connected]
+    working_dir: /
+    environment:
+      GATE_ISOLATED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    networks: [gate]
+    volumes:
+      - ../:/scripts:ro
+      - ${GATE_STATE:?Set GATE_STATE}:/state
+    mem_limit: 256m
+
+networks:
+  gate:
+    internal: true
+
+volumes:
+  app-storage:
+  plugin-storage:
+  database:
+  remote-runtime:

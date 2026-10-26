@@ -1,0 +1,91 @@
+name: Remote debug supplemental gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/public-api-v1]
+    paths:
+      - .github/workflows/remote-debug.yml
+      - scripts/remote_debug/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: remote-debug-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  remote-debug:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: flowspeech-remote-${{ github.run_id }}-${{ github.run_attempt }}
+      PYTHON_IMAGE: python:3.12.14-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Initialize a fresh supplemental state path
+        run: printf 'GATE_STATE=%s/flowspeech-remote-gate\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fetch and verify the immutable reviewed package
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          mkdir -p "$GATE_STATE"
+          url=$(python3 -c 'import json; print(json.load(open("scripts/deployed_ce/pins.json"))["package_url"])')
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --retry 2 --max-time 60 "$url" -o "$GATE_STATE/candidate.difypkg"
+          python3 -m scripts.remote_debug.prepare "$GATE_STATE"
+      - name: Stage images and binary dependencies before isolation
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          docker pull "$PYTHON_IMAGE"
+          docker run --rm -v "$GATE_STATE/plugin/requirements.txt:/requirements.txt:ro" -v "$GATE_STATE/wheels:/wheels" "$PYTHON_IMAGE" python -m pip download --only-binary=:all: -r /requirements.txt -d /wheels
+          docker compose -f scripts/remote_debug/compose.yaml --profile validation pull
+          docker compose -f scripts/remote_debug/compose.yaml run --rm stage-runtime
+      - name: Start fresh isolated CE with internal debugging port only
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          docker compose -f scripts/remote_debug/compose.yaml up -d db redis mock api worker plugin_daemon
+          python3 -m scripts.remote_debug.isolation initial
+          docker compose -f scripts/remote_debug/compose.yaml run --rm driver python -m scripts.remote_debug.driver bootstrap
+      - name: Register original remote entrypoint and validate real workflow
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          docker compose -f scripts/remote_debug/compose.yaml up -d remote_plugin
+          python3 -m scripts.remote_debug.isolation remote
+          docker compose -f scripts/remote_debug/compose.yaml run --rm driver python -m scripts.remote_debug.driver connected
+      - name: Disconnect remote process and reject local fallback
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          docker compose -f scripts/remote_debug/compose.yaml stop -t 10 remote_plugin
+          docker compose -f scripts/remote_debug/compose.yaml run --rm driver python -m scripts.remote_debug.driver disconnected
+      - name: Collect redacted service diagnostics
+        id: logs
+        if: always()
+        timeout-minutes: 2
+        run: python3 -m scripts.remote_debug.collect logs
+      - name: Remove and verify only this job's containers networks and volumes
+        if: always()
+        timeout-minutes: 2
+        run: python3 -m scripts.remote_debug.collect cleanup
+      - name: Finalize sanitized evidence after cleanup
+        id: evidence
+        if: always()
+        timeout-minutes: 1
+        run: python3 -m scripts.remote_debug.collect finalize
+      - name: Retain only sanitized supplemental evidence
+        if: always() && steps.logs.outcome == 'success' && steps.evidence.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dify-remote-debug-${{ github.run_id }}
+          path: ${{ runner.temp }}/flowspeech-remote-gate/evidence/
+          if-no-files-found: error
+          retention-days: 7
