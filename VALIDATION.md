@@ -2,10 +2,55 @@
 
 Date: 2026-10-26. Final release-gate follow-up in an isolated migration checkout.
 The release artifact passes 188 tests (previous baseline 94). Current source also
-includes 62 offline tests of the deployed-CE harness, for 250 source tests.
+includes 83 offline tests of the deployed-CE harness, for 271 source tests.
 The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
 
-## Deployed CE gate (startup reached; integration pending)
+## Deployed CE gate (installed; workflows pending)
+
+[CI run 40310456564](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40310456564)
+on commit b60394d passed isolation and installed the exact package through CE and
+the real local Go daemon. The installed runtime matched all eight plugin Python
+files; plugin_code_changed is false. The workflow stage failed before any test
+case or credential validation: results is empty and current_case is null.
+
+The sanitized artifact (ID 12644437082, 14876 bytes) was downloaded and verified:
+SHA-256 065bcc3e2a9b76a3a27a56adf33a7a0a82f8fdc86271821bdea4abb2026f540b.
+Its summary reports isolation=passed, install=passed, run=failed and
+short-host=not_run. The run error is a 120-second readiness timeout. API logs show
+repeated GET /info returning 400 with "you have not added provider", while the
+daemon successfully returned installed tool metadata (HTTP 200).
+
+The pinned [CE service contract](https://github.com/langgenius/dify/blob/50abea97062110044f15d0e03ccecadd9ccc87ca/api/services/tools/builtin_tools_manage_service.py#L111)
+requires saved provider credentials for /info; /tools requires only the installed
+provider. The driver incorrectly waited on /info before calling /add, so no wait
+duration could make the fresh instance ready. This is a driver ordering defect,
+not evidence of a plugin invocation or 200-second completion failure.
+
+The driver now checks the exact installed tool name through /tools, rejects invalid
+credentials, saves valid credentials, then checks /info and /tools before running
+the unchanged cases. The short-host stage still requires existing saved credentials
+and does not add them again. Permanent 4xx and redirects propagate immediately
+instead of becoming readiness timeouts; transient statuses retain bounded retries.
+Provider substage names are retained in sanitized failure evidence. No assertion,
+workflow case, timeout bound, network restriction or runtime package was removed.
+
+Current local results:
+
+- .venv/bin/python -m pytest tests/test_deployed_ce_gate.py -q: 83 passed (0.10s).
+- .venv/bin/python -m pytest -q: 271 passed (2.37s), 2 existing SDK warnings.
+- Extracted reviewed package, excluding development-only harness tests:
+  188 passed (2.29s), the same 2 warnings.
+- Both workflows pass actionlint 1.7.7; package audit and unchanged SHA-256 pass.
+
+The 21 new regressions reproduce CE's saved-credential prerequisite, verify the
+request order and exact tool identity, preserve invalid-credential rejection and
+all six cases including real-time bounds, require saved credentials on short-host,
+and verify permanent-error propagation and transient retry/deadline behavior.
+These are offline harness tests, not deployed workflow results. The next CI run
+must still validate credentials, workflow execution, persisted output and both
+real-time waits. Cloud remains unvalidated.
+
+### Previous startup-guard failure
 
 [CI run 40308695432](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40308695432)
 on commit 883ae06 started the real containers. PostgreSQL and Redis became healthy,
@@ -74,9 +119,8 @@ the reviewed package. No plugin source or clocks are changed. This trust setup
 and test-only acceptance of an unsigned package are explicitly disclosed limits.
 
 No Docker runtime is installed here and this worker did not push or dispatch CI.
-The coordinator's next run must verify the corrected isolation guard, installation,
-credentials, workflow routing, persisted output and real deadlines. Startup and
-migrations were reached in the failed run; end-to-end deployment is not validated.
+The later run passed isolation and installation as recorded above; credential
+validation, workflow routing, persisted output and real deadlines remain pending.
 See `scripts/deployed_ce/README.md` for coordinator commands and retained evidence.
 
 PR 3513 was verified open and draft. Cloud remains unvalidated: it requires an

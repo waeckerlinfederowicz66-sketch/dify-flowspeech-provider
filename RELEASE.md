@@ -4,18 +4,19 @@
 
 Marketplace update PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 is open and draft. Do not mark deployed CE or Cloud validation complete based on
-the SDK/source suites. The `Deployed CE release gate` has reached real CE startup,
-but not installation or workflow validation. Its 62 offline harness checks pass
-within the 250-test source suite; the unchanged package still passes 188 tests.
+the SDK/source suites. The `Deployed CE release gate` has passed real CE isolation
+and installation, but not credential or workflow validation. Its 83 offline harness
+checks pass within the 271-test source suite; the unchanged package passes 188 tests.
 The first CI attempt failed workflow validation before scheduling any jobs;
 the invalid job-level runner context has been moved to step-time initialization.
-Run [40308695432](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40308695432)
-reached healthy API/DB/Redis and then failed the isolation guard's network-name
-assertion. The guard incorrectly rejected Docker's none entry for the networkless
-init container. It now handles that representation without permitting routing or
-weakening Compose isolation. Failures retain sanitized per-service network evidence,
-and summary success requires the isolation check. Both workflows pass actionlint.
-Another deployed run is required; see VALIDATION.md for evidence and limitations.
+Run [40310456564](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40310456564)
+passed the corrected isolation guard, installed the package through the real daemon,
+and matched all eight plugin Python files. It then timed out waiting on provider
+/info before adding credentials. The pinned CE contract returns 400 until those
+credentials exist. The driver now checks /tools first and retains /info validation
+after credential save; permanent client errors fail immediately. All workflow
+assertions and timing bounds remain in place, and both workflows pass actionlint.
+Another deployed run is required; see VALIDATION.md for exact evidence and limits.
 The reviewed 125757-byte package remains unchanged at SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
 

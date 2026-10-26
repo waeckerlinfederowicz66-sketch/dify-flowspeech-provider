@@ -130,7 +130,10 @@ def wait_for(check, seconds=300):
             result = check()
             if result:
                 return result
-        except (HTTPError, URLError, ConnectionError, TimeoutError):
+        except HTTPError as error:
+            if error.code not in {408, 429, 500, 502, 503, 504}:
+                raise
+        except (URLError, ConnectionError, TimeoutError):
             pass
         if time.monotonic() >= deadline:
             raise TimeoutError("Disposable CE readiness/install deadline exceeded")
@@ -220,14 +223,20 @@ def run_case(console, case, *, delay, timeout, expect_audio, minimum=0, maximum=
 
 def run(console, *, short_host=False, progress=None):
     results = progress if progress is not None else []
+    console.current_case = "provider-readiness"
     console.login()
-    wait_for(lambda: console.json(PROVIDER_PATH + "/info"), 120)
+    # CE's /info requires saved credentials; /tools only requires the installed plugin.
+    tools = wait_for(lambda: console.json(PROVIDER_PATH + "/tools"), 120)
+    assert isinstance(tools, list) and any(tool.get("name") == "flowspeech_text_to_speech" for tool in tools)
     if short_host:
         assert os.environ["GATE_HOST_TIMEOUT"] == "180"
+        console.current_case = "provider-saved-credentials"
+        wait_for(lambda: console.json(PROVIDER_PATH + "/info"), 120)
         results.append(run_case(console, "deadline", delay=200, timeout=300, expect_audio=False, minimum=160, maximum=180))
         return results
     assert os.environ["GATE_HOST_TIMEOUT"] == "300"
     console.control("/configure", {"case": "basic", "delay": 1})
+    console.current_case = "provider-invalid-credentials"
     invalid_rejected = False
     try:
         result = console.json(PROVIDER_PATH + "/add", method="POST", body={
@@ -238,11 +247,14 @@ def run(console, *, short_host=False, progress=None):
     assert invalid_rejected, "CE accepted invalid provider credentials"
     audit = console.control("/audit")["calls"]
     assert audit and all(c["method"] == "GET" and c["path"] == "/api/v1/quota" for c in audit)
+    console.current_case = "provider-valid-credentials"
     result = console.json(PROVIDER_PATH + "/add", method="POST", body={
         "credentials": {"api_key": console.fixture["api_key"]}, "name": "Isolated fixture", "type": "api-key"})
     assert result["result"] == "success"
+    console.current_case = "provider-saved-credentials"
+    wait_for(lambda: console.json(PROVIDER_PATH + "/info"), 120)
     tools = console.json(PROVIDER_PATH + "/tools")
-    assert "flowspeech_text_to_speech" in json.dumps(tools)
+    assert isinstance(tools, list) and any(tool.get("name") == "flowspeech_text_to_speech" for tool in tools)
     results.append({"case": "provider-credentials", "invalid_rejected": True, "valid_saved": True})
     for case, delay, timeout, expect, minimum, maximum in [
         ("basic", 1, 300, True, 4.8, 60),

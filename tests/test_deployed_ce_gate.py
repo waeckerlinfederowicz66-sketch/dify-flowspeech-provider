@@ -4,13 +4,14 @@ import io
 import json
 from pathlib import Path
 import subprocess
+from urllib.error import HTTPError
 import uuid
 import wave
 
 import pytest
 import yaml
 
-from scripts.deployed_ce import check_isolation, collect
+from scripts.deployed_ce import check_isolation, collect, driver
 from scripts.deployed_ce.collect import redact
 from scripts.deployed_ce.driver import file_url, graph, terminal_event
 from scripts.deployed_ce.mock_http import State, fixture_wav
@@ -104,6 +105,149 @@ def test_partial_or_failed_workflow_cannot_pass(lines):
 
 def test_sse_terminal_and_heartbeat():
     assert terminal_event([b": ping\n", b'data: {"event":"workflow_finished","data":{"status":"succeeded","outputs":{}}}\n'])["outputs"] == {}
+
+
+class ProviderConsole:
+    """Pinned CE contract: installed tools exist before saved provider credentials."""
+
+    def __init__(self, *, saved=False, invalid_status=401):
+        self.fixture = {"api_key": KEY}
+        self.saved = saved
+        self.invalid_status = invalid_status
+        self.events = []
+        self.tools = [{"name": "flowspeech_text_to_speech"}]
+
+    def login(self):
+        self.events.append("login")
+
+    def json(self, path, **kwargs):
+        assert path.startswith(driver.PROVIDER_PATH)
+        suffix = path.removeprefix(driver.PROVIDER_PATH)
+        self.events.append(suffix)
+        if suffix == "/tools":
+            return self.tools
+        if suffix == "/info":
+            if not self.saved:
+                raise HTTPError(driver.BASE + "/console/api" + path, 400,
+                                "you have not added provider " + driver.PROVIDER, {}, None)
+            return {"plugin_id": "flowspeech/flowspeech", "name": "flowspeech"}
+        assert suffix == "/add" and kwargs["method"] == "POST"
+        if kwargs["body"]["credentials"]["api_key"] != KEY:
+            if self.invalid_status != 200:
+                raise HTTPError(driver.BASE + "/console/api" + path, self.invalid_status, "Rejected fixture", {}, None)
+        self.saved = True
+        return {"result": "success"}
+
+    def control(self, path, payload=None):
+        self.events.append(path)
+        if path == "/audit":
+            return {"calls": [{"method": "GET", "path": "/api/v1/quota"}]}
+        assert path == "/configure" and payload == {"case": "basic", "delay": 1}
+        return {}
+
+
+@pytest.mark.parametrize("invalid_status", [400, 401, 403])
+def test_driver_waits_for_installed_tools_then_saves_credentials_before_info(monkeypatch, invalid_status):
+    console = ProviderConsole(invalid_status=invalid_status)
+    calls = []
+
+    def run_case(client, case, **kwargs):
+        assert client is console and console.saved
+        assert console.events == ["login", "/tools", "/configure", "/add", "/audit", "/add", "/info", "/tools"]
+        calls.append((case, kwargs))
+        return {"case": case}
+
+    monkeypatch.setenv("GATE_HOST_TIMEOUT", "300")
+    monkeypatch.setattr(driver, "run_case", run_case)
+    progress = []
+    assert driver.run(console, progress=progress) is progress
+    assert progress[0] == {"case": "provider-credentials", "invalid_rejected": True, "valid_saved": True}
+    assert [case for case, _ in calls] == ["basic", "slow", "malformed", "api-redirect", "audio-redirect", "deadline"]
+    assert calls[1][1] == {"delay": 200, "timeout": 300, "expect_audio": True, "minimum": 199, "maximum": 295}
+    assert calls[-1][1] == {"delay": 200, "timeout": 10, "expect_audio": False, "minimum": 4, "maximum": 15}
+
+
+def test_driver_still_rejects_a_host_that_accepts_invalid_credentials(monkeypatch):
+    console = ProviderConsole(invalid_status=200)
+    monkeypatch.setenv("GATE_HOST_TIMEOUT", "300")
+    with pytest.raises(AssertionError, match="CE accepted invalid"):
+        driver.run(console)
+    assert console.current_case == "provider-invalid-credentials"
+    assert "/info" not in console.events
+
+
+def test_driver_requires_exact_tool_name_not_a_string_match(monkeypatch):
+    console = ProviderConsole()
+    console.tools = [{"name": "wrong_tool", "description": "flowspeech_text_to_speech"}]
+    monkeypatch.setenv("GATE_HOST_TIMEOUT", "300")
+    with pytest.raises(AssertionError):
+        driver.run(console)
+    assert console.current_case == "provider-readiness"
+    assert console.events == ["login", "/tools"]
+
+
+@pytest.mark.parametrize("saved", [True, False])
+def test_short_host_requires_existing_saved_credentials_without_adding_again(monkeypatch, saved):
+    console = ProviderConsole(saved=saved)
+    calls = []
+    monkeypatch.setenv("GATE_HOST_TIMEOUT", "180")
+    monkeypatch.setattr(driver, "run_case", lambda client, case, **kwargs: calls.append((case, kwargs)) or {"case": case})
+    if saved:
+        assert driver.run(console, short_host=True) == [{"case": "deadline"}]
+        assert calls == [("deadline", {"delay": 200, "timeout": 300, "expect_audio": False, "minimum": 160, "maximum": 180})]
+    else:
+        with pytest.raises(HTTPError) as caught:
+            driver.run(console, short_host=True)
+        assert caught.value.code == 400 and not calls
+        assert console.current_case == "provider-saved-credentials"
+    assert console.events == ["login", "/tools", "/info"]
+
+
+@pytest.mark.parametrize("status", [301, 302, 400, 401, 403, 404, 422])
+def test_readiness_does_not_hide_permanent_http_errors(monkeypatch, status):
+    error = HTTPError(driver.BASE + "/console/api" + driver.PROVIDER_PATH + "/info", status, "Fixture rejection", {}, None)
+    calls = []
+
+    def check():
+        calls.append("request")
+        raise error
+
+    monkeypatch.setattr(driver.time, "sleep", lambda _: pytest.fail("Permanent failures must not be retried"))
+    with pytest.raises(HTTPError) as caught:
+        driver.wait_for(check, 120)
+    assert caught.value is error and calls == ["request"]
+
+
+@pytest.mark.parametrize("status", [408, 429, 500, 502, 503, 504])
+def test_readiness_still_retries_transient_http_errors(monkeypatch, status):
+    calls = []
+    waits = []
+
+    def check():
+        calls.append("request")
+        if len(calls) == 1:
+            raise HTTPError(driver.BASE + "/console/api/setup", status, "Fixture startup", {}, None)
+        return {"step": "not_started"}
+
+    monkeypatch.setattr(driver.time, "monotonic", lambda: 0)
+    monkeypatch.setattr(driver.time, "sleep", waits.append)
+    assert driver.wait_for(check, 120) == {"step": "not_started"}
+    assert len(calls) == 2 and waits == [3]
+
+
+def test_readiness_transient_failure_still_hits_deadline(monkeypatch):
+    now = [0]
+    calls = []
+
+    def check():
+        calls.append("request")
+        raise HTTPError(driver.BASE + "/console/api/setup", 503, "Fixture startup", {}, None)
+
+    monkeypatch.setattr(driver.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(driver.time, "sleep", lambda duration: now.__setitem__(0, now[0] + duration))
+    with pytest.raises(TimeoutError, match="readiness/install deadline exceeded"):
+        driver.wait_for(check, 3)
+    assert now == [3] and len(calls) == 2
 
 
 def test_compose_fails_closed_and_pins_every_image():

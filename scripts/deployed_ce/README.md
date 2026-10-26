@@ -1,9 +1,10 @@
 # Deployed CE Release Gate
 
-This deployed-platform gate is **not yet passed**. Run 40308695432 reached a healthy
-CE API but stopped at the isolation check before installation. The none-network
-guard fix is covered offline and awaits a new deployed run. Offline tests do not
-establish that the plugin works on a deployed host; see VALIDATION.md for evidence.
+This deployed-platform gate is **not yet passed**. Run 40310456564 passed isolation
+and installed the exact package through CE and the real daemon. It then stalled
+on /info before credentials existed. The driver now checks installed /tools before
+adding credentials, then verifies /info. This ordering fix awaits another deployed
+run; offline tests do not establish workflow success. See VALIDATION.md for evidence.
 Keep Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 draft until the coordinator reviews actual CI evidence and the Cloud limitation.
 
@@ -86,9 +87,9 @@ job's Compose project and volumes; artifacts expire after seven days.
 ## Exact Remaining Gates
 
 1. This workstation has no Docker/Podman/Colima. Source and offline harness tests
-   pass. CI reached Compose startup/migrations, but the corrected isolation guard,
-   install routing, provider credential persistence, workflow execution, runtime
-   file storage and both real-time waits still require another CI run. An
+   pass. CI passed startup, isolation and real daemon installation. Provider
+   credential validation/persistence, workflow execution, runtime file storage and
+   both real-time waits still require another CI run after the driver fix. An
    integration failure is a failed gate, not an SDK-only substitute.
 2. Even a passing run covers this headless CE configuration only. It does not
    validate the web UI, a separately deployed reverse proxy, actual production
