@@ -32,7 +32,7 @@ def main():
                             capture_output=True, text=True, timeout=30)
     (evidence / "service-logs.txt").write_text(redact(result.stdout + result.stderr, sensitive))
     report = {"ce_passed": False, "cloud_passed": False, "stages": {}}
-    for stage in ("install", "run", "short-host"):
+    for stage in ("isolation", "install", "run", "short-host"):
         file = evidence / (stage + ".json")
         report["stages"][stage] = json.loads(file.read_text()).get("status") if file.exists() else "not_run"
     report["ce_passed"] = all(value == "passed" for value in report["stages"].values())

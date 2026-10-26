@@ -4,16 +4,23 @@
 
 Marketplace update PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 is open and draft. Do not mark deployed CE or Cloud validation complete based on
-the SDK/source suites. The new `Deployed CE release gate` workflow is prepared,
-not executed. Its 25 offline harness checks pass within the 213-test source suite.
+the SDK/source suites. The `Deployed CE release gate` has reached real CE startup,
+but not installation or workflow validation. Its 62 offline harness checks pass
+within the 250-test source suite; the unchanged package still passes 188 tests.
 The first CI attempt failed workflow validation before scheduling any jobs;
 the invalid job-level runner context has been moved to step-time initialization.
-Both workflows now pass actionlint, but real deployment still requires another run.
+Run [40308695432](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40308695432)
+reached healthy API/DB/Redis and then failed the isolation guard's network-name
+assertion. The guard incorrectly rejected Docker's none entry for the networkless
+init container. It now handles that representation without permitting routing or
+weakening Compose isolation. Failures retain sanitized per-service network evidence,
+and summary success requires the isolation check. Both workflows pass actionlint.
+Another deployed run is required; see VALIDATION.md for evidence and limitations.
 The reviewed 125757-byte package remains unchanged at SHA-256
 `ae19e4209a5b9693ca4435df4b0fa8dc3017e4648e6e69743c2452bb0f0c3384`.
 
 Coordinator: review and push the scoped workflow, harness, test and report changes
-to `codex/public-api-v1`; that push triggers the first bounded CE job. No secret
+to `codex/public-api-v1`; that push triggers the next bounded CE job. No secret
 configuration is needed. Follow `scripts/deployed_ce/README.md` for exact run/watch/
 download commands, failure evidence, cleanup and the separate Cloud access gate.
 The workstation has no container runtime; no deployed pass is claimed locally.

@@ -1,7 +1,9 @@
 # Deployed CE Release Gate
 
-This is a **prepared, not yet executed** deployed-platform gate. Offline harness
-tests do not establish that CE boots or that the plugin works on a deployed host.
+This deployed-platform gate is **not yet passed**. Run 40308695432 reached a healthy
+CE API but stopped at the isolation check before installation. The none-network
+guard fix is covered offline and awaits a new deployed run. Offline tests do not
+establish that the plugin works on a deployed host; see VALIDATION.md for evidence.
 Keep Marketplace PR [3513](https://github.com/langgenius/dify-plugins/pull/3513)
 draft until the coordinator reviews actual CI evidence and the Cloud limitation.
 
@@ -9,7 +11,7 @@ draft until the coordinator reviews actual CI evidence and the Cloud limitation.
 
 Push the reviewed changes to `codex/public-api-v1` in
 `waeckerlinfederowicz66-sketch/dify-flowspeech-provider`. Changes to this directory
-or `.github/workflows/deployed-ce.yml` trigger the first run automatically.
+or `.github/workflows/deployed-ce.yml` trigger the next run automatically.
 The worker does not push or dispatch workflows.
 
     gh run list --repo waeckerlinfederowicz66-sketch/dify-flowspeech-provider --workflow deployed-ce.yml --branch codex/public-api-v1 --limit 3
@@ -40,7 +42,11 @@ proxy, or production generation. No container port or Docker socket is exposed.
 
 Dependencies are downloaded as binary wheels before starting CE. The daemon
 installs them offline with `--no-index`. Every deployed container uses a Docker
-`internal` network (or no network), verified before installation. DNS aliases
+`internal` network (or no network), verified before installation. Docker's none
+entry is accepted only in mode none with no IP addresses or routes; it is not an
+allowlisted routable network. Host ports and privileged/socket access remain
+forbidden. Failure evidence contains only service, mode and attached network
+names, never raw inspect environment variables. DNS aliases
 `flowspeech.io` and `static.flowspeech.io` resolve only to the mock container.
 No missing mock can fall back to the production API.
 
@@ -71,7 +77,7 @@ the unsigned review candidate; this does not prove Marketplace signature accepta
 Retained evidence includes `install.json`, `run.json`, `short-host.json`,
 `runtime-identity.json`, `isolation.json`, package audit, pinned image/package
 identities, dependency-wheel hashes, and bounded redacted service logs.
-`summary.json` reports CE success only when all three stages pass and always
+`summary.json` reports CE success only when isolation and all three stages pass and always
 reports Cloud as unvalidated. A failed diagnostics redaction check prevents
 artifact upload. Settings, credentials, CA private keys, cookies, wheels, database
 volumes, and raw workflow responses are never uploaded. Cleanup removes only this
@@ -80,10 +86,10 @@ job's Compose project and volumes; artifacts expire after seven days.
 ## Exact Remaining Gates
 
 1. This workstation has no Docker/Podman/Colima. Source and offline harness tests
-   pass, but Docker Compose rendering, image startup/migrations, install routing,
-   provider credential persistence, workflow execution, runtime file storage and
-   both real-time waits still require the first CI run. An initial integration
-   failure is a failed gate, not a reason to substitute an SDK-only check.
+   pass. CI reached Compose startup/migrations, but the corrected isolation guard,
+   install routing, provider credential persistence, workflow execution, runtime
+   file storage and both real-time waits still require another CI run. An
+   integration failure is a failed gate, not an SDK-only substitute.
 2. Even a passing run covers this headless CE configuration only. It does not
    validate the web UI, a separately deployed reverse proxy, actual production
    storage overrides, other CE versions, or Dify Cloud's managed policies.

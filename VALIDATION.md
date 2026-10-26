@@ -2,10 +2,47 @@
 
 Date: 2026-10-26. Final release-gate follow-up in an isolated migration checkout.
 The release artifact passes 188 tests (previous baseline 94). Current source also
-includes 25 offline tests of the new deployed-CE harness, for 213 source tests.
+includes 62 offline tests of the deployed-CE harness, for 250 source tests.
 The final archive supersedes all earlier local 0.2.0 candidates and is unchanged.
 
-## Prepared deployed CE gate (not executed)
+## Deployed CE gate (startup reached; integration pending)
+
+[CI run 40308695432](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40308695432)
+on commit 883ae06 started the real containers. PostgreSQL and Redis became healthy,
+the API completed migrations and became healthy at 10:38:05 UTC, and the worker
+started. The startup step then failed in check_isolation.py at its network-name
+allowlist assertion, not in Compose startup. Install, run and short-host were
+skipped; the retained summary correctly reports CE and Cloud as unvalidated.
+
+The sanitized artifact (ID 12643706380, 11041 bytes) was downloaded and verified:
+SHA-256 8bbeed8e5419708f5b9404b21eaa5108d578fab7722ff61fde35ca976be04779.
+It contains package-audit.json, pins.json, service-logs.txt and summary.json.
+The old guard wrote isolation evidence only on success, so this run does not
+identify the offending container. The Compose init-storage service has network
+mode none; Docker's none network entry reproduces the failing assertion offline.
+This is the identified guard defect, not a claim that raw runtime inspect data
+was retained. Docker documents that [none provides only loopback](https://docs.docker.com/engine/network/drivers/none/).
+
+The guard now accepts an empty network map or the none entry only for network
+mode none, with no IPv4/IPv6 addresses, gateways or prefixes. Other containers
+must use exactly the inspected project-internal network. Host/bridge/shared
+network modes, extra attachments, published ports, privileged containers and the
+Docker socket remain rejected. Compose, image pins and network isolation are
+unchanged. Failure evidence now records service, mode and network names without
+environment variables; the summary requires isolation plus all three deployed
+stages to pass. No installation or workflow pass is inferred from local tests.
+
+Local revalidation after this fix:
+
+- .venv/bin/python -m pytest tests/test_deployed_ce_gate.py -q: 62 passed (0.10s).
+- .venv/bin/python -m pytest -q: 250 passed (3.31s), 2 existing SDK warnings.
+- Extracted reviewed package, excluding development-only harness tests:
+  188 passed (2.53s), the same 2 warnings.
+- Both workflows pass actionlint 1.7.7; package audit and unchanged SHA-256 pass.
+
+The 37 new regressions cover Docker none representations, routed and extra
+attachments, unsafe network modes, host protections, failure-evidence retention,
+secret-free inspect summaries and fail-closed result aggregation.
 
 The first [CI attempt, 40307156979](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40307156979),
 was rejected during workflow validation before any jobs or containers started.
@@ -18,8 +55,8 @@ Pinned actionlint 1.7.7 reproduces the original context error and passes both
 corrected workflows (shellcheck and pyflakes integrations disabled). Its Darwin
 arm64 archive was checked against the official release checksums before execution:
 2693315b9093aeacb4ebd91a993fea54fc215057bf0da2659056b4bc033873db.
-The corrected source suite passes 213 tests with the same two SDK warnings.
-This repairs workflow admission only; deployed CE and Cloud remain unvalidated.
+That earlier correction passed 213 source tests and repaired workflow admission
+only; it did not establish a deployed CE or Cloud pass.
 
 `.github/workflows/deployed-ce.yml` and `scripts/deployed_ce/` provide one bounded
 40-minute GitHub-hosted job. It uses digest-pinned CE 1.18.0, the real 0.6.10-local
@@ -29,20 +66,17 @@ persisted WAV, and checks real 200-second completion and a 180-second host deadl
 Malformed audio, redirect refusal, credential-free downloads and no resubmission
 are checked through the deployed workflow rather than an SDK shim.
 
-All deployed containers are on an internal network, with no published ports.
+All deployed containers use an internal network or no network, with no published ports.
 Dependencies are staged as wheels and installed offline. Fixed API/storage hosts
 resolve to an HTTPS fixture; a disposable CA is added only to the isolated
 runtime's certifi trust bundle. Installed plugin Python bytes are compared with
 the reviewed package. No plugin source or clocks are changed. This trust setup
 and test-only acceptance of an unsigned package are explicitly disclosed limits.
 
-Local checks: 212 source tests passed (2.44s), including 24 new offline harness
-checks; the unchanged extracted package passed its 188 runtime tests (2.32s).
-The development-only harness tests are excluded from that package run.
-Byte-compilation and package audit passed. These are not deployed results.
-No Docker runtime is installed here and no workflow was pushed or dispatched.
-The first real CI run still must verify Compose rendering, startup/migrations,
-installation, credentials, workflow routing, persisted output and real deadlines.
+No Docker runtime is installed here and this worker did not push or dispatch CI.
+The coordinator's next run must verify the corrected isolation guard, installation,
+credentials, workflow routing, persisted output and real deadlines. Startup and
+migrations were reached in the failed run; end-to-end deployment is not validated.
 See `scripts/deployed_ce/README.md` for coordinator commands and retained evidence.
 
 PR 3513 was verified open and draft. Cloud remains unvalidated: it requires an
@@ -125,9 +159,10 @@ compatibility alias, not a required field.
 ## Safety and limitations
 
 No authenticated production API requests, real credentials, paid generation,
-email, commits, pushes, publication or workflow/OIDC changes were made by this
-worker. Public homepage/static-asset and Marketplace metadata reads were used
-only for release verification. Existing changes were preserved.
+email, pushes or publication were made by this worker. Validation changes are
+committed locally for coordinator review; no OIDC or authentication changes were
+made. Public asset, Marketplace and CI reads were used for release verification.
+Existing changes were preserved.
 No end-to-end production generation or deployed Dify verification is claimed.
 A single in-flight HTTP request may finish cleanup after the local caller deadline;
 it cannot submit a retry or another recording. Recover accepted jobs with their
