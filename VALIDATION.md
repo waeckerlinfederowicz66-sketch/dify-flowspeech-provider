@@ -11,9 +11,106 @@ all other members are identical. Old package bytes and run evidence are retained
 Current local validation: 386 source tests (188 runtime/package, 112 CE harness,
 86 remote harness), 188 tests against the actual replacement, artifact audit and
 all three workflow actionlint checks pass. The two existing SDK warnings remain.
-The replacement's deployed CE/remote-debug gates are **pending**. The historical
-CE and remote passes below cover only the previous `ae19e420...c3384` package and
-must not be attributed to this new hash. Cloud remains explicitly unvalidated.
+The replacement's **deployed CE and official remote-debug gates both passed** at
+head `f86c9e173582845b7766795666c12c9d2b3b52db`, as audited below. Historical
+results remain attributed to their original package. Cloud remains explicitly
+unvalidated; Marketplace readiness is the coordinator's decision.
+
+## Current candidate: deployed revalidation passed
+
+Both runs tested the exact `5fc5942e...12f05f4` archive above, not a repack or a
+transfer of old results. Every job step, including cleanup and artifact upload,
+succeeded on attempt 1. The ordinary source CI also passed in
+[run 40341321063](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40341321063).
+
+| Gate | Run / job | Artifact ID | Archive bytes | SHA-256 |
+| --- | --- | --- | --- | --- |
+| Full CE | [40341320875](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40341320875) / 121636478773 | 12660501086 | 24555 | `4eb66282c5a6f381bbafc797615419f372b2c8d548bc42248cc67d2c6d29dae0` |
+| Remote debug | [40341321010](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40341321010) / 121636479607 | 12659540576 | 26377 | `7d2b136d6ee6581c337b54229e4aac548dccf17fe265023620415cf2a3a2e664` |
+
+All nine CE and eleven remote evidence members were audited; downloaded archive
+sizes and hashes match GitHub artifact metadata. Their pins match the current
+repository exactly, including the immutable Marketplace commit and package hash.
+Both package audits report 126197 bytes, 17 members and no unintended members.
+CE's installed-runtime byte comparison matched all eight Python files;
+`plugin_code_changed=false`. Remote execution matched all 17 package members,
+and every retained Python SHA-256 was independently compared with the current
+archive's eight Python files. Its original `python -m main` entrypoint ran with
+`INSTALL_METHOD=remote`, and actual daemon dispatch reported `runtime_type=remote`.
+
+### Full CE cases
+
+| Case | Actual elapsed | Creates / polls / downloads | Result |
+| --- | --- | --- | --- |
+| Provider credentials | not timed | quota validation | Invalid rejected; valid saved |
+| Basic | 22.446s | 1 / 1 / 1 | One persisted WAV and recovery IDs |
+| Slow, host 300/tool 295 | 200.384s | 1 / 40 / 1 | One persisted WAV and recovery IDs |
+| Malformed WAV | 5.145s | 1 / 1 / 1 | Recovery IDs; no audio |
+| API redirect | 0.141s | 1 / 0 / 0 | Rejected; forbidden target not reached |
+| Unsafe audio redirect | 5.930s | 1 / 1 / 1 | Rejected; forbidden target not reached |
+| Safe HTTPS audio redirect | 5.146s | 1 / 1 / 2 | Both hops credential-free; one WAV |
+| Requested timeout 10s | 5.129s | 1 / 1 / 0 | Recovery IDs before deadline; no audio |
+| Post-restart readiness | 3.138s | 0 creates; 1 quota GET | Invalid rejected on attempt 2 |
+| Host 180/tool 175 | 170.335s | 1 / 34 / 0 | Recovery IDs before both limits; no audio |
+
+The final case requested 300 seconds against a 200-second job. The job log
+confirms daemon recreation with host timeout 180. Its quota-only readiness probe
+is excluded from the measured 170.335 seconds. The unchanged tool cap is 175;
+no retry or second submission occurred. Minimum poll intervals were 5.005194s
+(slow) and 5.005260s (short host). Expected startup/invalid-key errors in the
+service logs precede the successful readiness probe, not a failed workflow.
+
+### Remote protocol cases
+
+The isolated fresh workspace began with zero plugins and made zero local-install
+calls. Invalid credentials were rejected in 0.102s with one quota GET and zero
+creates; valid credentials were saved after one quota GET. The actual remote
+workflow completed in 17.368s with one POST, one poll, one download and one
+persisted WAV. After stopping the remote process, the same draft failed with an
+unavailable-plugin error in 0.126s, with zero API/storage calls, zero creates and
+zero remaining plugin installations. No local fallback was used.
+
+### Persistence, isolation and cleanup
+
+CE basic, slow and safe-redirect plus remote basic each persisted one 18044-byte
+PCM 24000 Hz mono16 WAV. Each was fetched through CE's file service and compared
+byte-for-byte with the fixture; all four retained hashes equal:
+`ef2b9384c28fa5e94babe9397b3c7201393c4fe9b7e4c39c0683a3f944b2e7ad`.
+All storage hops, including the cross-host safe redirect, have
+`authorization_present=false` and `cookie_present=false`. Every measured
+generation workflow submitted exactly once; forbidden redirect targets were
+never requested.
+
+CE initial/post-restart and remote initial/connected isolation checks all passed.
+Deployment services and ephemeral drivers used only the job's internal network,
+except the storage initializer with network mode `none`. No host ports were
+published; debug port 5003 stayed internal. Images and wheels were staged before
+isolation: this does not claim the entire GitHub runner had no Internet access.
+Both artifacts record 36 dependency wheel hashes.
+
+CE cleanup succeeded and its job log records removal of seven containers, one
+network and all three volumes. Remote cleanup's retained zero-leftover guard
+reports zero containers, networks and volumes with the validation profile
+enabled. Its final summary also confirms ephemeral credential/CA-key files were
+removed. Artifacts contain only allowlisted reports and redacted logs, not
+workspace keys, credentials, cookies, private CA material or database contents.
+
+Final summaries: **CE `ce_passed=true`; remote `remote_debug_passed=true`; both
+`cloud_passed=false`**. This is actual headless CE 1.18.0 / Go daemon 0.6.10-local
+package-install and official remote-protocol validation, with fixture-only HTTP
+and no paid API. Cloud, browser/UI, production API/storage, external proxies,
+other versions and managed egress policies remain unvalidated. Fixture-CA trust
+and disposable CE's unsigned-package acceptance are not production trust or
+Marketplace signature validation. Documented limitations remain available for
+reviewer acceptance; no unconditional Cloud prerequisite is inferred.
+
+Local retained evidence directories are `.tools/ce-run-40341320875/` and
+`.tools/remote-debug-run-40341321010/`, each containing `diagnostics.zip`, extracted
+`evidence/`, REST metadata and an independent `audit.json`. Historical archives
+remain untouched. This result update changes only VALIDATION/RELEASE; workflow
+path-filtered harness READMEs retain the earlier handoff snapshot to avoid a
+result-only deployment rerun. No source, package, pins, assertions or workflow
+changed; no public write or Marketplace state change was made.
 
 ## Historical CE pass: previous package (isolated headless CE only)
 

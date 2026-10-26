@@ -11,12 +11,38 @@ Only packaged README/PRIVACY changed; eight Python files, manifest, requirements
 icon and all other members remain byte-identical. The old archive is retained
 under `.tools/package-archive/` with its full hash in the filename.
 
-The replacement passes 386 source tests and 188 actual-package tests, but its
-**deployed CE and remote-debug gates are pending**. Push the reviewed source/pin
-commits to trigger both workflows; review the new hash in both retained artifacts
-before claiming either gate passed for this candidate. Keep PR 3513 draft pending
-the coordinator's final review. Cloud is an explicitly unvalidated limitation,
-not an invented absolute prerequisite. No worker public writes were made.
+The replacement passes 386 source tests, 188 actual-package tests, actionlint and
+artifact audit. **Both deployed gates passed for this exact hash** at head
+`f86c9e173582845b7766795666c12c9d2b3b52db`:
+
+- Full CE [run 40341320875](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40341320875),
+  artifact 12660501086, 24555 bytes, SHA-256
+  `4eb66282c5a6f381bbafc797615419f372b2c8d548bc42248cc67d2c6d29dae0`.
+- Official remote-debug [run 40341321010](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40341321010),
+  artifact 12659540576, 26377 bytes, SHA-256
+  `7d2b136d6ee6581c337b54229e4aac548dccf17fe265023620415cf2a3a2e664`.
+
+Both archives and all retained reports were independently audited against the
+current package/pins and eight Python files. CE slow completion took 200.384s;
+host 180/tool 175 returned recovery in 170.335s after a separate 3.138s readiness
+probe, with one submission, 34 polls and no audio. Credentials, malformed WAV,
+both rejected redirects, safe redirect, requested deadline and persistence passed.
+Remote registration/dispatch completed a workflow in 17.368s; disconnect then
+rejected that same draft in 0.126s with zero API/storage calls and no fallback.
+Every storage hop was credential/cookie-free; four persisted WAVs share SHA-256
+`ef2b9384c28fa5e94babe9397b3c7201393c4fe9b7e4c39c0683a3f944b2e7ad`.
+All deployment isolation checks passed. CE logs confirm removal of seven
+containers, one network and three volumes; remote cleanup confirms zero remaining
+containers/networks/volumes and removal of ephemeral secret files.
+
+Final summaries are `ce_passed=true`, `remote_debug_passed=true` and
+`cloud_passed=false`. See VALIDATION.md for every case, exact retained evidence
+and scope. Cloud, browser/UI, production services and managed egress policies
+remain unvalidated; no paid API was used. Cloud is a documented limitation, not
+an unconditional prerequisite. Keep PR 3513 draft pending the coordinator's final
+review. This result-only update changes VALIDATION/RELEASE, not path-filtered
+harness READMEs, runtime, package, pins or workflows. No worker public writes
+were made; the coordinator owns push and PR readiness.
 
 ## Historical deployed evidence: previous package
 
@@ -65,8 +91,8 @@ published history. The worker does not push or dispatch CI.
 
 1. Review the changed source and VALIDATION.md; no user changes existed initially.
 2. Re-run .venv/bin/python -m pytest -q using Python 3.12 and requirements.txt.
-3. Use Dify Plugin CLI 0.6.12:
-   .tools/dify plugin package . -o dist/flowspeech-0.2.0.difypkg
+3. Preserve the exact validated archive and immutable pin above; no repack is
+   needed for this documentation-only result update.
 4. Inspect the archive and validate its manifest/schema and real SDK blob output.
 5. The intended storage hostname is verified as static.flowspeech.io; see
    VALIDATION.md for public asset and scoped configuration evidence. Confirm the
@@ -86,7 +112,8 @@ Its original head was waeckerlinfederowicz66-sketch/dify-plugins:add-flowspeech-
 
 Do not claim #3008 is pending or try to update it as an open submission.
 The coordinator followed the Marketplace version-update process in draft PR
-3513, referencing the merged original. The deployment release gate is still open.
+3513, referencing the merged original. Both defined headless deployment gates
+are now passed for the current candidate; final Marketplace review remains open.
 
 ## Packaging tool provenance
 
@@ -171,8 +198,9 @@ The accepted 0.1.0 package is unchanged. The pending update still contains exact
 one new .difypkg, with metadata already inside it. Local PR text is in
 scripts/marketplace_update_pr.md; the coordinator owns the actual PR body/state.
 
-After both new deployed gates pass for this exact hash, the coordinator reviews
-remaining requirements and documented limitations before changing PR readiness.
+Both new deployed gates passed for this exact hash. The coordinator reviews their
+retained evidence, remaining requirements and documented limitations before
+changing PR readiness.
 Do not open a duplicate update PR or reuse closed PR 3008. This worker did not
 push, publish, change PR state or modify the official website.
 
