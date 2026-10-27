@@ -1,8 +1,38 @@
 # Release 0.2.0
 
-## Current deployed-validation handoff
+## Local Transport Review Candidate - Not Published
 
-The current unpublished 0.2.0 candidate is 126197 bytes/17 members, SHA-256:
+The final local candidate now also includes diagnostic privacy hardening:
+`dist/transport-privacy-review-candidate/flowspeech-0.2.0.difypkg`, 127962 bytes,
+17 members, SHA-256
+`86ecb76eafd9f93497ea3254e79cd65924b63ccbb2ab1b620bdb5e1cefddc608`.
+Source tests: 491 passed. Extracted-package tests: 293 passed. The adapter SHA-256
+is `ef930ce515ad28c5efeb54b7fb07d4ec983131d2771c2c8a948bb93b95b903f6`.
+This supersedes the transport-only local candidate below, not the submitted
+Marketplace archive. Independent review must use this new hash. No deployed
+CE/remote-debug pass is claimed for either local correction candidate.
+
+### Earlier Transport-Only Candidate
+
+2026-10-27: source now contains unreleased response-body/close retry-policy and
+bounded-worker corrections. Version metadata remains 0.2.0 by instruction. The
+new local artifact is `dist/transport-review-candidate/flowspeech-0.2.0.difypkg`,
+127660 bytes, 17 members, SHA-256:
+`44b34622f59be71514e364ad133967d36eb13a5f7420f8edf7482fe88e06c254`.
+It passes 461 source tests and 263 extracted-package tests, including 75 new
+transport regressions. See the first section of VALIDATION.md for commands and
+limitations. It has not been tested in deployed CE/remote-debug or published.
+
+The existing main dist archive, Marketplace submission and deployment pins are
+unchanged. They still identify `5fc5942e...12f05f4` and do NOT contain these fixes.
+The deployed evidence below applies only to that old artifact. The coordinator
+must independently review this delta, determine the publishable version, and
+refresh candidate/pins and deployment gates before any replacement submission.
+No commit, push, publish, production request or ROOT status update was performed.
+
+## Historical Deployed-Validation Handoff
+
+The previously submitted 0.2.0 candidate is 126197 bytes/17 members, SHA-256:
 `5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4`.
 The coordinator committed it at the existing draft Marketplace binary path in
 commit `1024cfe3385e390626e0e4253b23d4c6b9469651`. Shared pins now use that immutable

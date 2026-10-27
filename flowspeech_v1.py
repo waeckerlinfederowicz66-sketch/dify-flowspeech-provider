@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import struct
 import threading
 import time
@@ -15,6 +16,20 @@ import httpx
 
 PENDING = {"queued", "running", "merging", "settling"}
 TERMINAL = {"success", "failed", "cancelled"}
+_HTTP_WORKER_LIMIT = 8
+_HTTP_WORKERS = threading.BoundedSemaphore(_HTTP_WORKER_LIMIT)
+
+
+class _ResponseReadError(httpx.TransportError):
+    """Keep received retry policy without exposing the transport's raw exception."""
+    def __init__(self, response):
+        super().__init__("Response body could not be read")
+        self.status_code = response.status_code
+        self.retry_after = response.headers.get("Retry-After")
+
+    @property
+    def retryable(self):
+        return 200 <= self.status_code < 300 or self.status_code == 429 or 500 <= self.status_code < 600
 
 
 class ApiError(RuntimeError):
@@ -178,12 +193,23 @@ class V1Client:
         self._download = download_client or httpx.Client(trust_env=False)
         self._owns_client, self._owns_download = http_client is None, download_client is None
         self.user_agent = user_agent
+        self._state_lock = threading.Lock()
+        self._http_active = False
+        self._closed = False
+        self._clients_closed = False
 
     def close(self):
-        if self._owns_client:
-            self._client.close()
-        if self._owns_download:
-            self._download.close()
+        with self._state_lock:
+            self._closed = True
+            if self._http_active or self._clients_closed:
+                return
+            self._clients_closed = True
+        try:
+            if self._owns_client:
+                self._client.close()
+        finally:
+            if self._owns_download:
+                self._download.close()
 
     def __enter__(self):
         return self
@@ -204,33 +230,75 @@ class V1Client:
         self.sleep(seconds)
         self._remaining(deadline)
 
+    def _error_token(self, value):
+        if (isinstance(value, str) and self.api_key not in value
+                and re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value, flags=re.ASCII)):
+            return value
+        return None
+
     def _http(self, method, url, deadline, *, body=None, request_id=None, download=False):
         # HTTP phase timeouts alone do not bound a slow streamed response's total duration.
-        # The daemon handles only this one request, never a retry or another recording.
+        # A timed-out worker retains its slot until I/O and owned-client cleanup finish.
+        self._remaining(deadline)
+        with self._state_lock:
+            if self._closed:
+                raise ApiError("FlowSpeech client is closed", code="client_closed")
+            if self._http_active:
+                raise ApiError("Previous HTTP request is still active; retain recovery IDs",
+                               code="client_busy", retryable=True)
+            if not _HTTP_WORKERS.acquire(blocking=False):
+                raise ApiError("FlowSpeech HTTP worker capacity exhausted; retain recovery IDs",
+                               code="transport_busy", retryable=True)
+            self._http_active = True
         completed = threading.Event()
+        abandoned = threading.Event()
         outcome = []
 
         def perform():
             try:
+                if abandoned.is_set():
+                    return
                 outcome.append(self._http_once(method, url, deadline, body=body,
-                                               request_id=request_id, download=download))
+                                               request_id=request_id, download=download,
+                                               abandoned=abandoned))
             except BaseException as exc:
                 outcome.append(exc)
             finally:
-                completed.set()
+                try:
+                    self._finish_http()
+                except BaseException:
+                    outcome[:] = [ApiError("FlowSpeech transport cleanup failed", code="transport_cleanup")]
+                finally:
+                    completed.set()
 
-        remaining = self._remaining(deadline)
-        worker = threading.Thread(target=perform, daemon=True, name="flowspeech-http")
-        worker.start()
-        if not completed.wait(remaining):
-            raise ApiError("FlowSpeech total deadline exceeded during HTTP request",
-                           code="deadline_exceeded", retryable=True)
-        if isinstance(outcome[0], BaseException):
-            raise outcome[0]
-        self._remaining(deadline)
-        return outcome[0]
+        try:
+            worker = threading.Thread(target=perform, daemon=True, name="flowspeech-http")
+            worker.start()
+        except BaseException:
+            self._finish_http()
+            raise ApiError("Unable to start HTTP worker", code="transport_busy", retryable=True) from None
+        try:
+            if not completed.wait(self._remaining(deadline)):
+                raise ApiError("FlowSpeech total deadline exceeded during HTTP request",
+                               code="deadline_exceeded", retryable=True)
+            if isinstance(outcome[0], BaseException):
+                raise outcome[0]
+            self._remaining(deadline)
+            return outcome[0]
+        finally:
+            abandoned.set()
 
-    def _http_once(self, method, url, deadline, *, body=None, request_id=None, download=False):
+    def _finish_http(self):
+        try:
+            with self._state_lock:
+                self._http_active = False
+                closed = self._closed
+            if closed:
+                self.close()
+        finally:
+            _HTTP_WORKERS.release()
+
+    def _http_once(self, method, url, deadline, *, body=None, request_id=None, download=False, abandoned=None):
         headers = {"Accept": "audio/wav" if download else "application/json",
                    "Accept-Encoding": "identity", "User-Agent": self.user_agent}
         if not download:
@@ -244,6 +312,9 @@ class V1Client:
         request = httpx.Request(method, url, headers=headers, content=body,
                                 extensions={"timeout": dict.fromkeys(("connect", "read", "write", "pool"), budget)})
         client = self._download if download else self._client
+        if abandoned is not None and abandoned.is_set():
+            raise ApiError("HTTP request abandoned before submission", code="deadline_exceeded", retryable=True)
+        self._remaining(deadline)
         response = client.send(request, stream=True, follow_redirects=False, auth=None)
         limit = self.max_download_bytes if download else 2 * 1024 * 1024
         try:
@@ -263,17 +334,27 @@ class V1Client:
                 data.extend(chunk)
             self._remaining(deadline)
             return response.status_code, response.headers, bytes(data)
+        except httpx.TransportError:
+            raise _ResponseReadError(response) from None
         finally:
-            response.close()
+            try:
+                response.close()
+            except httpx.TransportError:
+                raise _ResponseReadError(response) from None
 
     def _api(self, method, path, deadline, *, body=None, request_id=None):
         for attempt in range(self.max_retries + 1):
             try:
                 status, headers, content = self._http(method, self.base_url + path, deadline,
                                                       body=body, request_id=request_id)
-            except httpx.TransportError:
-                error = ApiError("FlowSpeech transport failed", code="transport_error", retryable=True)
+            except httpx.TransportError as exc:
+                received = isinstance(exc, _ResponseReadError)
+                error = ApiError("FlowSpeech transport failed", code="transport_error",
+                                 status_code=exc.status_code if received else None,
+                                 retryable=exc.retryable if received else True)
                 delay = self.poll_interval
+                if received:
+                    delay = max(delay, retry_after(exc.retry_after))
             else:
                 if 300 <= status < 400:
                     raise ApiError("Unexpected API redirect refused", status_code=status, code="redirect_refused")
@@ -289,10 +370,10 @@ class V1Client:
                 details = payload.get("error", {}) if isinstance(payload, dict) else {}
                 details = details if isinstance(details, dict) else {}
                 error = ApiError(
-                    str(details.get("message") or f"FlowSpeech API returned HTTP {status}").replace(self.api_key, "[redacted]"),
-                    status_code=status, code=details.get("code"),
+                    f"FlowSpeech API returned HTTP {status}",
+                    status_code=status, code=self._error_token(details.get("code")) or "http_error",
                     retryable=status == 429 or (status >= 500 and details.get("retryable") is True),
-                    trace_id=payload.get("traceId") if isinstance(payload, dict) else None,
+                    trace_id=self._error_token(payload.get("traceId")) if isinstance(payload, dict) else None,
                 )
                 delay = max(self.poll_interval, retry_after(headers.get("Retry-After")))
             if not error.retryable or attempt == self.max_retries:
@@ -395,10 +476,14 @@ class V1Client:
                                  check_deadline=lambda: self._remaining(deadline))
                     return content
                 delay = max(self.poll_interval, retry_after(headers.get("Retry-After")))
-            except httpx.TransportError:
+            except httpx.TransportError as exc:
+                received = isinstance(exc, _ResponseReadError)
                 error = ApiError("Audio transport failed; retry the existing URL", code="download_failed",
-                                 retryable=True, result_url=url)
+                                 status_code=exc.status_code if received else None,
+                                 retryable=exc.retryable if received else True, result_url=url)
                 delay = self.poll_interval
+                if received:
+                    delay = max(delay, retry_after(exc.retry_after))
             if not error.retryable or attempt == self.max_retries:
                 raise error
             self._wait(delay, deadline)
@@ -426,7 +511,8 @@ class V1Client:
             if job["status"] != "success":
                 details = job.get("error") or {}
                 raise ApiError(f"FlowSpeech job {job['status']}",
-                               code=details.get("code", job["status"]) if isinstance(details, dict) else job["status"])
+                               code=(self._error_token(details.get("code")) if isinstance(details, dict) else None)
+                               or job["status"])
             result = self._result(job)
             result_url = result["url"]
             audio = self.download_audio(result_url, deadline=deadline)

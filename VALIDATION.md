@@ -1,6 +1,115 @@
 # Validation: dify-flowspeech-provider 0.2.0
 
-Date: 2026-10-26. Current unpublished documentation-replacement candidate:
+## Final Local Diagnostic Privacy Candidate
+
+2026-10-27: a targeted SDK-wrapper probe confirmed that code, trace_id and
+result_url attributes were not directly printed by Dify, but arbitrary upstream
+error.message text (including a synthetic private audio link) reached both the
+real ToolInvokeMessage output and the provider's exception chain. The adapter
+now uses fixed HTTP status messages, filters code/trace values to bounded ASCII
+tokens excluding its configured key, and filters terminal job error codes.
+Programmatic result_url remains available for recovery; Dify does not render it.
+Exception dictionaries should not be logged because recovery URLs are sensitive.
+
+New tests/test_error_privacy.py: 30 cases, initially 27 failed / 3 passed before
+the fix. It covers malformed diagnostic types, own-key reflection, private text
+and URLs, terminal codes, preserved valid tokens, real SDK messages, provider
+exception chains and non-rendered recovery URL metadata.
+
+Final source command `.venv/bin/python -B -m pytest -q -p no:cacheprovider`:
+491 passed, two existing SDK warnings, 3.21s. Packaging used the same verified
+Dify CLI as below with output
+`dist/transport-privacy-review-candidate/flowspeech-0.2.0.difypkg`.
+Artifact audit/extraction:
+
+```sh
+.venv/bin/python -B scripts/verify_artifacts.py dist/transport-privacy-review-candidate/flowspeech-0.2.0.difypkg --extract-dify dist/transport-privacy-review-candidate/extracted
+```
+
+From that extracted directory:
+
+```sh
+../../../.venv/bin/python -B -m pytest ../../../tests/test_flowspeech_client.py ../../../tests/test_v1_contract.py ../../../tests/test_wav_validation.py ../../../tests/test_job_identifiers.py ../../../tests/test_tool.py ../../../tests/test_runtime_deadline.py ../../../tests/test_runtime_entrypoint.py ../../../tests/test_transport_safety.py ../../../tests/test_error_privacy.py -q -o pythonpath= -p no:cacheprovider
+# 293 passed, two existing SDK warnings, 2.89s
+```
+
+New package: 127962 bytes, 17 members, SHA-256
+`86ecb76eafd9f93497ea3254e79cd65924b63ccbb2ab1b620bdb5e1cefddc608`.
+Adapter SHA-256:
+`ef930ce515ad28c5efeb54b7fb07d4ec983131d2771c2c8a948bb93b95b903f6`.
+Privacy tests SHA-256:
+`8c9e2ad82d6b25ff0483f46109ec96b0f86cb19ab1bf0e2e344b38f8153dc6dc`.
+All packaged files match source, runtime imports resolve inside the extracted
+candidate, and the artifact secret/inventory audit passes. The submitted and
+main dist packages still have their original `5fc5942e...12f05f4` hash. No version
+change, commit, public write, production call or deployed-gate claim was made.
+
+## 2026-10-27 Local Transport Corrections
+
+This is an unpublished local candidate, not a correction to an already submitted
+or public artifact. Version metadata remains 0.2.0. No commits, public writes,
+production calls, native application operations or ROOT release-status edits
+were performed. No applicable AGENTS.md was found; the assigned worktrees were
+clean before these edits.
+
+Changes: preserve received HTTP status and Retry-After through body/close
+TransportError; reject retries of received 401/403; keep stable recording UUIDs
+and credential-free downloads. Bound HTTP work to eight workers per process and
+one per client without a queue; retain slots until workers finish, reject busy
+calls before I/O, reject delayed submissions after caller abandonment, defer
+owned-client cleanup, and never close borrowed clients or cancel server jobs.
+The Dify host margin and hard caller deadline are unchanged.
+
+The initial 48-case regression revision failed 43 cases on the old source (five
+passed). The final test file contains 75 cases and passes both alone with native
+Python threads and within the SDK/gevent-loaded source and artifact suites.
+Coverage includes create/poll/download, 401/403, 429/503, interrupted success,
+HTTP-date/seconds/minimum cooldown, body plus close failure, retry limits,
+deadline rejection, stable UUID/body, redirects without credentials, worker
+saturation, deferred cleanup, borrowed-client ownership, failed thread start,
+abandoned worker dispatch and delayed request construction.
+
+Commands run from the repository unless noted:
+
+```sh
+.venv/bin/python -B -m pytest -q -p no:cacheprovider tests/test_transport_safety.py
+# 75 passed, 0.70s
+.venv/bin/python -B -m pytest -q -p no:cacheprovider
+# 461 passed, 2 existing SDK warnings, 3.32s
+.tools/dify plugin package . -o dist/transport-review-candidate/flowspeech-0.2.0.difypkg
+.venv/bin/python -B scripts/verify_artifacts.py dist/transport-review-candidate/flowspeech-0.2.0.difypkg --extract-dify dist/transport-review-candidate/extracted
+```
+
+From `dist/transport-review-candidate/extracted`:
+
+```sh
+../../../.venv/bin/python -B -m pytest ../../../tests/test_flowspeech_client.py ../../../tests/test_v1_contract.py ../../../tests/test_wav_validation.py ../../../tests/test_job_identifiers.py ../../../tests/test_tool.py ../../../tests/test_runtime_deadline.py ../../../tests/test_runtime_entrypoint.py ../../../tests/test_transport_safety.py -q -o pythonpath= -p no:cacheprovider
+# 263 passed, 2 existing SDK warnings, 3.05s
+```
+
+The official Dify CLI 0.6.12 checksum was reverified before execution:
+`c730a27b118d1342ac5650f99155033110f394f5a6dbf3023689328bf921efb6`.
+The new candidate has 17 members, 127660 bytes, SHA-256:
+`44b34622f59be71514e364ad133967d36eb13a5f7420f8edf7482fe88e06c254`.
+All 17 members exactly match source. Import origins for flowspeech_v1,
+flowspeech_client, runtime_config and tools.text_to_speech were explicitly
+verified inside the extracted directory. The artifact inventory/secret-pattern
+audit passed. The old main dist and submitted Marketplace archives both remain
+at SHA-256 `5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4`.
+
+Post-fix review rechecked state transitions, cleanup ownership, retry policy,
+artifact identity and recovery-ID propagation. No additional confirmed P1/P2
+was found in this delta. Remaining limitation: a transport that never returns
+retains a bounded slot; after eight such workers the process fails closed until
+they finish or an operator intervenes. Already-entered transport I/O cannot be
+forcibly interrupted, so the deadline does not prove server cancellation. These
+are offline/mock/SDK-process results, not production or deployed-platform passes.
+Existing gevent SSL import-order and Pydantic config warnings remain. Historical
+CE/remote-debug evidence below must not be attributed to the new artifact.
+
+## Historical Documentation-Replacement Candidate
+
+Date: 2026-10-26. Previously submitted documentation-replacement candidate:
 `dist/flowspeech-0.2.0.difypkg`, 126197 bytes, 17 members, SHA-256
 `5fc5942eac8185e17f4150da74aceeed2a7c08f935f55b93597f1968a12f05f4`.
 The immutable Marketplace commit is `1024cfe3385e390626e0e4253b23d4c6b9469651`;
@@ -8,7 +117,7 @@ shared pins and main dist now match its downloaded binary. Only README/PRIVACY
 differ from the old package; eight Python files, manifest, dependencies, icon and
 all other members are identical. Old package bytes and run evidence are retained.
 
-Current local validation: 386 source tests (188 runtime/package, 112 CE harness,
+Historical local validation: 386 source tests (188 runtime/package, 112 CE harness,
 86 remote harness), 188 tests against the actual replacement, artifact audit and
 all three workflow actionlint checks pass. The two existing SDK warnings remain.
 The replacement's **deployed CE and official remote-debug gates both passed** at
@@ -16,7 +125,7 @@ head `f86c9e173582845b7766795666c12c9d2b3b52db`, as audited below. Historical
 results remain attributed to their original package. Cloud remains explicitly
 unvalidated; Marketplace readiness is the coordinator's decision.
 
-## Current candidate: deployed revalidation passed
+## Historical Candidate: Deployed Revalidation Passed
 
 Both runs tested the exact `5fc5942e...12f05f4` archive above, not a repack or a
 transfer of old results. Every job step, including cleanup and artifact upload,

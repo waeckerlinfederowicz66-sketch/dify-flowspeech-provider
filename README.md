@@ -3,6 +3,10 @@
 A Dify tool plugin for [FlowSpeech](https://flowspeech.io/) public API v1.
 [Source repository](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider).
 
+This checkout includes unreleased transport hardening. The previously submitted
+0.2.0 package does not include it; version metadata is unchanged pending release
+coordination. Existing deployment evidence does not validate this new candidate.
+
 ## Setup
 
 1. Create a FlowSpeech API key with an active paid Basic, Pro or Scale subscription.
@@ -74,15 +78,31 @@ accordingly. Host limits of five seconds or less are rejected before submission.
 The plugin no longer hardcodes a 180-second timeout. It does not emit heartbeat
 messages while generating; cancellation and timeout do not cancel the server job.
 
-Polling is at least five seconds, and
-longer Retry-After values (seconds or HTTP dates) are honored. Transient transport
-failures, 429, and explicitly retryable 5xx errors get at most two retries.
+Polling is at least five seconds, and longer Retry-After values (seconds or HTTP
+dates) are honored even when reading or closing the response body fails. A
+received 401/403 is never retried. Transient transport failures, interrupted
+success/5xx responses, 429, and complete explicitly retryable 5xx errors get at
+most two retries. A complete 5xx response with retryable=false is not retried.
 Create retries preserve the UUID and exact body. A deadline stops local waiting,
 not the server job; use the saved IDs for recovery or explicit cancellation.
+
+HTTP work is limited to eight active workers per plugin process and one per
+client, without a queue. Saturation fails before network I/O with transport_busy
+or client_busy; retain the same recovery UUID rather than creating a new job.
+The caller still returns at its total deadline. A transport that does not return
+can retain a worker slot until it finishes; a permanently stuck transport can
+exhaust capacity and requires operator investigation. No new request is started
+by an abandoned worker. Closing a client prevents new work and defers owned
+transport cleanup until its active worker exits. Borrowed clients are never
+closed by this adapter, and no server job is automatically cancelled.
 
 Errors expose status_code, code, retryable, trace_id, request_id, job_id and
 result_url where available. Failed and cancelled jobs raise errors. Deleted
 success results are reported as result_deleted, not as empty audio.
+HTTP diagnostics use fixed status messages, not upstream error text. Error codes
+and trace IDs accept only bounded ASCII tokens that do not contain the configured
+API key. Dify messages retain recovery IDs but do not print the programmatic
+result_url attribute; treat that URL as sensitive and do not log exception dictionaries.
 
 Audio is a separately downloaded, validated WAV (24000 Hz, mono, 16 bit).
 Validation checks the entire RIFF size, every chunk boundary and alignment pad,
