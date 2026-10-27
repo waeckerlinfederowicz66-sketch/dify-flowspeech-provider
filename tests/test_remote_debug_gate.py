@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GATE = ROOT / "scripts/remote_debug"
 KEY = "12345678-1234-4234-8234-123456789abc"
 APP = "22345678-1234-4234-8234-123456789abc"
-IDENTITY = "flowspeech/flowspeech:0.2.0@" + "a" * 64
+IDENTITY = "flowspeech/flowspeech:0.2.1@" + "a" * 64
 MISSING = "plugin provider flowspeech/flowspeech/flowspeech not found"
 
 
@@ -79,7 +79,7 @@ def test_prepare_uses_pinned_package_fresh_state_and_explicit_debug_limits(tmp_p
     with zipfile.ZipFile(package, "w") as archive:
         for name in names:
             archive.writestr(name, b"fixture Python source")
-        archive.writestr("manifest.yaml", b"version: 0.2.0\n")
+        archive.writestr("manifest.yaml", b"version: 0.2.1\n")
         for i in range(8):
             archive.writestr(f"fixture{i}.txt", b"fixture member")
     pins = {"package_sha256": hashlib.sha256(package.read_bytes()).hexdigest()}

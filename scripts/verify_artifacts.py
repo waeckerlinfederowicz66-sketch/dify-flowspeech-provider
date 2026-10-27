@@ -48,12 +48,12 @@ def inspect(path):
     assert sum(len(content) for _, content in entries) <= 100 * 1024 * 1024
     if path.suffix == ".whl":
         metadata = next(content for name, content in entries if name.endswith(".dist-info/METADATA"))
-        assert b"Version: 0.2.0\n" in metadata
+        assert b"Version: 0.2.1\n" in metadata
         assert b"Requires-Dist: httpx" in metadata
     if path.suffix == ".difypkg":
         assert {"main.py", "runtime_config.py", "flowspeech_v1.py"} <= set(dict(entries))
         manifest = dict(entries)["manifest.yaml"]
-        assert manifest.startswith(b"version: 0.2.0")
+        assert manifest.startswith(b"version: 0.2.1\n")
     return {"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             "bytes": path.stat().st_size, "members": [name for name, _ in entries],
             "secrets_or_unintended_members": False}

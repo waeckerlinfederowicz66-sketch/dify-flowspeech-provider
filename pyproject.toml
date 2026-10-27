@@ -1,6 +1,6 @@
 [project]
 name = "dify-flowspeech-provider"
-version = "0.2.0"
+version = "0.2.1"
 description = "FlowSpeech text-to-speech tool plugin for Dify"
 readme = "README.md"
 requires-python = ">=3.12"

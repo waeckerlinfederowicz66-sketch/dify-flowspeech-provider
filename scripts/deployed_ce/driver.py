@@ -204,12 +204,12 @@ def install(console: Console, state: Path) -> dict:
     pins = json.loads((Path(__file__).parent / "pins.json").read_text())
     assert hashlib.sha256(package).hexdigest() == pins["package_sha256"]
     boundary = "ce-gate-" + uuid.uuid4().hex
-    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"pkg\"; filename=\"flowspeech-0.2.0.difypkg\""
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"pkg\"; filename=\"flowspeech-0.2.1.difypkg\""
             "\r\nContent-Type: application/octet-stream\r\n\r\n").encode() + package + f"\r\n--{boundary}--\r\n".encode()
     uploaded = console.json("/workspaces/current/plugin/upload/pkg", method="POST", body=body,
                             headers={"Content-Type": "multipart/form-data; boundary=" + boundary})
     identity = uploaded["unique_identifier"]
-    assert identity.startswith("flowspeech/flowspeech:0.2.0@")
+    assert identity.startswith("flowspeech/flowspeech:0.2.1@")
     console.json("/workspaces/current/plugin/install/pkg", method="POST",
                  body={"plugin_unique_identifiers": [identity]})
 

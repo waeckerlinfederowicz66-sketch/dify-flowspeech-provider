@@ -14,7 +14,7 @@ from scripts.deployed_ce.collect import redact
 
 LIST = "/workspaces/current/plugin/list?page=1&page_size=100"
 DEBUG_KEY = "/workspaces/current/plugin/debugging-key"
-IDENTITY = re.compile(r"flowspeech/flowspeech:0\.2\.0@[0-9a-f]{64}\Z")
+IDENTITY = re.compile(r"flowspeech/flowspeech:0\.2\.1@[0-9a-f]{64}\Z")
 
 
 class Console(ce.Console):

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Local Review Candidate
+## 0.2.1 - 2026-10-27 (Candidate)
 
 - Use fixed HTTP diagnostics and bounded safe code/trace tokens so upstream
   messages, reflected keys and private audio links do not enter Dify error output.
@@ -10,8 +10,9 @@
   abandoned workers from submitting requests, and defer owned-client cleanup.
 - Add offline source/artifact regressions for retry policy, recovery IDs,
   credential-free downloads, worker saturation and late submission prevention.
-- Version metadata remains 0.2.0. These changes are not in the previously
-  submitted package and have not been published or deployment-tested.
+- These changes are not in the previously submitted 0.2.0 package. The new
+  candidate requires its own final-artifact CE and remote-debug validation
+  before coordinator approval; publication has not occurred.
 
 ## 0.2.0 - 2026-10-26
 

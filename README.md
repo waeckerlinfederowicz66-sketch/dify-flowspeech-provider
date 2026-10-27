@@ -3,14 +3,15 @@
 A Dify tool plugin for [FlowSpeech](https://flowspeech.io/) public API v1.
 [Source repository](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider).
 
-This checkout includes unreleased transport hardening. The previously submitted
-0.2.0 package does not include it; version metadata is unchanged pending release
-coordination. Existing deployment evidence does not validate this new candidate.
+Version 0.2.1 is a locally prepared safety release candidate. It includes bounded
+HTTP workers, deadline/retry corrections and diagnostic privacy fixes absent from
+the previously submitted 0.2.0 package. Publication is a coordinator action.
+Historical deployment evidence does not validate this new candidate.
 
 ## Setup
 
 1. Create a FlowSpeech API key with an active paid Basic, Pro or Scale subscription.
-2. Install version 0.2.0 and add the key in Dify's encrypted provider credentials.
+2. Install the coordinator-approved 0.2.1 package and add the key in Dify's encrypted provider credentials.
 3. Add Generate speech with FlowSpeech to a workflow.
 4. Supply text and a voice, or omit text and supply a JSON array in Speaker segments.
 5. Configure the tool deadline and Dify/plugin execution timeouts for the expected job duration.
@@ -124,13 +125,13 @@ use /api/v1/tts/jobs/{UUID} and /api/v1/tts/jobs/{UUID}/cancel.
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt pytest==8.4.2
 .venv/bin/python -m pytest -q
-dify plugin package . -o dist/flowspeech-0.2.0.difypkg
+dify plugin package . -o dist/flowspeech-0.2.1.difypkg
 ```
 
 The internal client now uses httpx. Test injection uses http_client and
 download_client, replacing the old requests session argument. timeout is a total
 seconds value, not a requests connect/read tuple.
 
-PR #3008 was verified merged, not pending, on 2026-10-26. This 0.2.0 package is
+PR #3008 was verified merged, not pending, on 2026-10-26. This 0.2.1 package is
 prepared locally only; no new Marketplace acceptance or release is claimed.
 The coordinator owns the version-update submission. See RELEASE.md.

@@ -71,7 +71,7 @@ def test_manifest_and_tool_schema():
     root = Path(text_to_speech.__file__).resolve().parents[1]
     manifest = yaml.safe_load((root / "manifest.yaml").read_text())
     tool = yaml.safe_load((root / "tools/text_to_speech.yaml").read_text())
-    assert manifest["version"] == "0.2.0"
+    assert manifest["version"] == "0.2.1"
     assert "static.flowspeech.io" in manifest["network"]["domains"]
     assert {p["name"] for p in tool["parameters"]} >= {"text", "voice_name", "segments", "request_id", "timeout"}
 
@@ -114,6 +114,6 @@ def test_real_sdk_manifest_provider_and_tool_schemas(monkeypatch):
     manifest = PluginConfiguration.model_validate(yaml.safe_load((root / "manifest.yaml").read_text()))
     provider = ToolProviderConfiguration.model_validate(yaml.safe_load((root / "provider/flowspeech.yaml").read_text()))
     tool = ToolConfiguration.model_validate(yaml.safe_load((root / "tools/text_to_speech.yaml").read_text()))
-    assert manifest.version == "0.2.0" and manifest.meta.version == "0.1.0"
+    assert manifest.version == "0.2.1" and manifest.meta.version == "0.1.0"
     assert provider.tools[0].identity.name == tool.identity.name
 

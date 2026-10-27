@@ -72,7 +72,7 @@ def invoke_runtime(scenario, *, host_timeout=300, validate=False):
         process.stdin.close()
         process.stdout.close()
     manifest = next(message for message in messages if message.get("type") == "plugin")
-    assert manifest["name"] == "flowspeech" and manifest["version"] == "0.2.0"
+    assert manifest["name"] == "flowspeech" and manifest["version"] == "0.2.1"
     sessions = [message["data"] for message in messages if message.get("event") == "session"]
     observations = [message["offline_observation"] for message in messages if "offline_observation" in message]
     return sessions, observations

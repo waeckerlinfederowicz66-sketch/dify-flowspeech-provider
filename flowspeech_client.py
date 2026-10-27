@@ -20,7 +20,7 @@ class FlowSpeechAudio:
 
 class FlowSpeechClient(V1Client):
     def __init__(self, api_key: str, **kwargs) -> None:
-        super().__init__(api_key=api_key, user_agent="dify-flowspeech-provider/0.2.0", **kwargs)
+        super().__init__(api_key=api_key, user_agent="dify-flowspeech-provider/0.2.1", **kwargs)
 
     def check_quota(self) -> dict[str, Any]:
         return self.quota()["quota"]
