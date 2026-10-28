@@ -50,11 +50,11 @@ def test_official_public_cli_and_frozen_pins():
     assert qa.CLI_VERSION == "v0.6.12"
     assert qa.CLI_URL == "https://github.com/langgenius/dify-plugin-daemon/releases/download/0.6.12/dify-plugin-linux-amd64"
     assert qa.CLI_SHA256 == "f5190893643492c3f17f12c9752615a5652e47bbf30e84298634e176611aa108"
-    assert qa.PACKAGE_SHA256 == "26933a9636a6d77ff940558c3f1cbaf31d89ebaae0148e020a4ba26289886fe6"
-    assert qa.PACKAGE_SIZE == 128002 and qa.MEMBER_COUNT == 17
+    assert qa.PACKAGE_SHA256 == "523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2"
+    assert qa.PACKAGE_SIZE == 127641 and qa.MEMBER_COUNT == 17
     pins = json.loads((ROOT / "scripts/deployed_ce/build-inputs.json").read_text())
     qa.verify_inputs(ROOT, pins)
-    frozen = ROOT / "dist/flowspeech-0.2.1.difypkg"
+    frozen = ROOT / "dist/docs-r1/flowspeech-0.2.1.difypkg"
     if frozen.exists():
         qa.verify_package(frozen, pins)
     stage = json.loads((ROOT / "scripts/deployed_ce/pins.json").read_text())

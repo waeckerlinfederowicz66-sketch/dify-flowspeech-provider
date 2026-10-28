@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CLI_VERSION = "v0.6.12"
 CLI_URL = "https://github.com/langgenius/dify-plugin-daemon/releases/download/0.6.12/dify-plugin-linux-amd64"
 CLI_SHA256 = "f5190893643492c3f17f12c9752615a5652e47bbf30e84298634e176611aa108"
-PACKAGE_SHA256 = "26933a9636a6d77ff940558c3f1cbaf31d89ebaae0148e020a4ba26289886fe6"
-PACKAGE_SIZE = 128002
+PACKAGE_SHA256 = "523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2"
+PACKAGE_SIZE = 127641
 MEMBER_COUNT = 17
 
 

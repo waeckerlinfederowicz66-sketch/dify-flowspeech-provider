@@ -4,8 +4,8 @@
   "daemon_version": "0.6.10-local",
   "daemon_commit": "1310a18b2f6bc6f18768a0a6265484830891433c",
   "graphon_commit": "4fa22141774dff80e90e4dfa98ea3e6fbf0421bb",
-  "package_path": "dist/flowspeech-0.2.1.difypkg",
-  "package_sha256": "26933a9636a6d77ff940558c3f1cbaf31d89ebaae0148e020a4ba26289886fe6",
+  "package_path": "dist/docs-r1/flowspeech-0.2.1.difypkg",
+  "package_sha256": "523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2",
   "images": {
     "api": "langgenius/dify-api:1.18.0@sha256:0120970fb4ea59aa328d63b7dda635cccc071efb8aae470cd07115a026dbffd3",
     "daemon": "langgenius/dify-plugin-daemon:0.6.10-local@sha256:34412a22d1e1d1a6c73727fef88cffbcdd9be7a21bf9ad3076b4bf5c1b88fd9b",
