@@ -32,18 +32,13 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Download exact own-repo draft QA candidate
+      - name: Download exact own-repo draft QA candidate by API ID
         timeout-minutes: 3
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/dist"
-          gh release download flowspeech-0.2.1-qa-20261027 \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern flowspeech-0.2.1.difypkg \
-            --dir "$GITHUB_WORKSPACE/dist"
-          printf '%s  %s\n' '26933a9636a6d77ff940558c3f1cbaf31d89ebaae0148e020a4ba26289886fe6' "$GITHUB_WORKSPACE/dist/flowspeech-0.2.1.difypkg" | sha256sum --check --strict
+          python3 -m scripts.deployed_ce.download_qa_candidate
       - name: Verify the coordinator-staged candidate and prepare disposable settings
         timeout-minutes: 3
         run: |
