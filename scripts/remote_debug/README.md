@@ -1,4 +1,30 @@
-# Supplemental Remote-Debug Gate
+# Current 0.2.1 Exact-Payload Remote-Debug Gate
+
+Current pin: `dist/docs-r1/flowspeech-0.2.1.difypkg`,127641 bytes,17 members,
+SHA-256 `523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2`; tested PIN `2c4d84437f378e82c03531e171bbdb30e4ff2e59`.
+The existing contents:read workflow independently packages the clean checkout
+using the checksum-pinned official public CLI,checks17 inputs/exact bytes before
+Docker,and retains only sanitized evidence. No acquisition token,draft asset
+access,transfer fallback,permission or isolation change is involved.
+
+[Actual remote-debug run](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639776746) passed all steps.
+The downloaded12-file artifact's API digest/build proof/runtime identity were
+independently checked. Quota-only rejection,valid credential save,persisted WAV,
+disconnect failure without fallback,and zero containers/networks/volumes with
+ephemeral credential removal passed. Tests used the original entrypoint and
+official TCP protocol in synthetic headless CE,not Cloud/UI/production.
+CI provenance remains PIN even if excluded documentation is committed later.
+No new run,source push or publication is authorized by this document.
+
+Historical sections below are preserved as dated evidence, not current
+instructions or publication claims. Earlier PR/status/hash statements are
+superseded by the verified 2026-10-28 snapshot: PRs #3008 and #3513 merged.
+
+## Historical Supplemental Gate Documentation
+
+Earlier hashes, commands and results below apply only to their original packages.
+
+### Supplemental Remote-Debug Gate
 
 This independent, bounded CI job tests Dify's official TCP remote-debug protocol.
 It does not replace or modify the passed full CE gate (run `40326427753`, head

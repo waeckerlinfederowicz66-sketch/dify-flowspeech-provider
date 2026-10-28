@@ -1,4 +1,31 @@
-# Validation: dify-flowspeech-provider 0.2.0
+# Validation: FlowSpeech 0.2.1 Exact Docs Payload
+
+Package: `dist/docs-r1/flowspeech-0.2.1.difypkg`,127641 bytes,17 members.
+SHA-256 `523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2`; tested PIN `2c4d84437f378e82c03531e171bbdb30e4ff2e59`.
+Fresh local results:585 source,322 focused/privacy/staging,293 extracted-package
+tests; four actual SDK loopback source/package cases,pip check,strict staging
+and all-three-workflow actionlint passed. Pytest has two existing SDK warnings.
+[Source CI](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639738635) passed585 at the same PIN.
+[CE](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639803640) passed the full matrix:slow200.307s,
+host-budget recovery170.311s; [remote-debug](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639776746)
+passed original entrypoint,quota/valid-save/audio,disconnect-without-fallback,
+runtime hash comparisons and cleanup. API ZIP digests and12/10 exact evidence
+allowlists were independently verified for this package,not borrowed from history.
+
+All generation used synthetic fixtures. No Cloud/browser/UI/production or proxy
+trust/egress claim. Remote zero-resource/credential-file cleanup passed; CE's
+existing Compose cleanup passed without a separate zero-count/per-file artifact.
+These runs tested PIN only. A later excluded-docs commit must retain its separate
+identity; its CI is not established by relabeling these runs.
+
+Historical sections below are preserved as dated evidence, not current
+instructions or publication claims. Earlier PR/status/hash statements are
+superseded by the verified 2026-10-28 snapshot: PRs #3008 and #3513 merged.
+
+## Historical 0.2.0 Validation
+
+The remaining sections are preserved historical evidence for their stated
+0.2.0 hashes. Their passed deployment gates do not validate 0.2.1.
 
 ## Final Local Diagnostic Privacy Candidate
 

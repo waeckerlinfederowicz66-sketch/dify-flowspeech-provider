@@ -1,4 +1,30 @@
-# Plugin Submission
+# FlowSpeech 0.2.1 Post-Gate Submission Notes
+
+New package only: `flowspeech/flowspeech/flowspeech-0.2.1.difypkg`.
+127641 bytes,17 members,SHA-256 `523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2`.
+Tested PIN: `2c4d84437f378e82c03531e171bbdb30e4ff2e59`. [CE](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639803640) and
+[remote-debug](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639776746) passed; exact downloaded evidence was independently
+verified. No Marketplace acceptance,Cloud/UI/production pass is claimed.
+
+Actual prior PRs [3008](https://github.com/langgenius/dify-plugins/pull/3008) and
+[3513](https://github.com/langgenius/dify-plugins/pull/3513) were verified merged in
+the 2026-10-28 snapshot; the public listing showed0.2.0 at that snapshot.
+Preserve both old package files. A separate new0.2.1
+PR body must use the current official template,new hash and only these new gates;
+do not resubmit the historical0.2.0 body below. Risk is medium because user content
+is sent to a third-party service that creates recordings and can consume credits.
+Publication bodies and source/default refs remain subject to parent review.
+Any later docs-only commit is not the PIN CI commit and must be labeled separately.
+
+Historical sections below are preserved as dated evidence, not current
+instructions or publication claims. Earlier PR/status/hash statements are
+superseded by the verified 2026-10-28 snapshot: PRs #3008 and #3513 merged.
+
+## Historical 0.2.0 PR Draft
+
+The following draft and evidence are preserved for their original version only.
+
+### Plugin Submission
 
 Local coordinator draft only; updating this file does not change the public PR.
 Current candidate: immutable Marketplace commit

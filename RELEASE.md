@@ -1,4 +1,29 @@
-# Release 0.2.0
+# FlowSpeech 0.2.1 Final Package Acceptance
+
+Package: `dist/docs-r1/flowspeech-0.2.1.difypkg`,127641 bytes,17 members.
+SHA-256 `523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2`.
+DOC `6a5d4dd422e0c378ec63c0c7f5661b35f6905064`; tested PIN `2c4d84437f378e82c03531e171bbdb30e4ff2e59`.
+Both independent exact-payload builds passed before Docker:
+[remote-debug](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639776746) and [CE](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639803640); downloaded artifact digests,
+member/runtime identity, actual cases and cleanup were independently checked.
+Source CI passed585 tests; fresh local focused322/extracted293/4SDK loopback
+cases passed. Only public README/CHANGELOG changed from the protected15 members.
+
+These are PIN CI results, not CI for any later excluded-docs-only commit.
+Original QA refs/draft/assets and old packages remain preserved. Source/default
+updates,formal release and a new0.2.1 Marketplace PR need separate parent review
+of the publication bodies and this docs-only diff; none is implied by this file.
+No Cloud/browser/UI/production API or external-proxy trust/egress pass is claimed.
+Remote cleanup proved zero resources/credential removal; CE Compose cleanup
+succeeded with remaining fixture state owned by the ephemeral runner.
+
+Historical sections below are preserved as dated evidence, not current
+instructions or publication claims. Earlier PR/status/hash statements are
+superseded by the verified 2026-10-28 snapshot: PRs #3008 and #3513 merged.
+
+## Historical Release 0.2.0 Evidence
+
+Everything below records earlier artifacts only, not the 0.2.1 release candidate.
 
 ## Local Transport Review Candidate - Not Published
 

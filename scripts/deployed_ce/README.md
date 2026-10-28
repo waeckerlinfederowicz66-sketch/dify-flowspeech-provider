@@ -1,4 +1,30 @@
-# Deployed CE Release Gate
+# Current 0.2.1 Exact-Payload CE Gate
+
+Current pin: `dist/docs-r1/flowspeech-0.2.1.difypkg`,127641 bytes,17 members,
+SHA-256 `523701c995e653e66fdc357077a13bc1ce337a115efe54e371975046857284f2`.
+Tested source PIN: `2c4d84437f378e82c03531e171bbdb30e4ff2e59`.
+The existing read-only workflow builds its own package from a clean Git export,
+verifies17 input hashes and the pinned official public CLI,then requires exact
+size/hash before the unchanged independent `stage_candidate --source` check.
+It uses no acquisition GH_TOKEN/private QA asset route or artifact-transfer fallback.
+Build proof is copied after preparation into the existing sanitized evidence path.
+
+[Actual CE run](https://github.com/waeckerlinfederowicz66-sketch/dify-flowspeech-provider/actions/runs/40639803640) passed all cases and Compose cleanup.
+Its downloaded10-file artifact and runtime/package evidence passed independent
+readback:slow200.307s and host-budget recovery170.311s. No separate CE zero-count
+or per-file cleanup artifact exists; remaining fixture state is ephemeral-runner-owned.
+These are synthetic headless PIN results,not Cloud/UI/production validation or
+CI for a later excluded-docs-only commit. No extra rerun/publication is authorized.
+
+Historical sections below are preserved as dated evidence, not current
+instructions or publication claims. Earlier PR/status/hash statements are
+superseded by the verified 2026-10-28 snapshot: PRs #3008 and #3513 merged.
+
+## Historical Harness Documentation
+
+The older artifact pins and results below are preserved as historical evidence.
+
+### Deployed CE Release Gate
 
 The current candidate in `pins.json` is the 126197-byte documentation replacement
 at immutable Marketplace commit `1024cfe3385e390626e0e4253b23d4c6b9469651`, SHA-256
