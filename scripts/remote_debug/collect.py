@@ -11,7 +11,7 @@ from scripts.deployed_ce.collect import redact
 # Explicitly targeted startup does not enable profiles for later logs/down commands.
 COMPOSE = ["docker", "compose", "-f", str(Path(__file__).parent / "compose.yaml"), "--profile", "validation"]
 STAGES = ("isolation-initial", "bootstrap", "runtime-identity", "isolation-remote", "connected", "disconnected", "cleanup")
-ALLOWED = {name + ".json" for name in STAGES} | {"pins.json", "package-audit.json", "summary.json", "service-logs.txt"}
+ALLOWED = {name + ".json" for name in STAGES} | {"pins.json", "package-audit.json", "summary.json", "service-logs.txt", "build-proof.json"}
 PRIVATE_STATE = ("remote-key", "fixture.json", "runtime.env", "ca.key")
 
 

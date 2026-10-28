@@ -1,0 +1,23 @@
+{
+  "reviewed_runtime_commit": "c6b9b21fc889591f2e5113f904506fd1008b248e",
+  "source_filter": {"path": ".difyignore", "bytes": 198, "sha256": "b365f5479a74ffb905797d709ab4375e6e98c4715fa1fd321982d18d259de522"},
+  "members": [
+    {"path": "CHANGELOG.md", "bytes": 2273, "sha256": "049afe6adbd1d7125e4b32b2ba06a4b90ba94f4d6b160d37cb8b4ead7528870a"},
+    {"path": "LICENSE", "bytes": 1068, "sha256": "58cafcd850cfecfc206e15db800708b3e6654656f6fca438c5b527b032c04da2"},
+    {"path": "PRIVACY.md", "bytes": 1765, "sha256": "1baad9c400825244d88d15e0fb8965c185e6c8b8f2abb135de9802826371e087"},
+    {"path": "README.md", "bytes": 7635, "sha256": "d3e4f6358c71af00117894f7387cbcf774f95e4b9d0662227abde13dfcb69fef"},
+    {"path": "_assets/icon.png", "bytes": 109308, "sha256": "52593bccc45c36647a906cf97681a254ae6f2dbd82c33c813cda224cfa7d3c69"},
+    {"path": "flowspeech_client.py", "bytes": 1128, "sha256": "6e0fec5122d18148440c054982321a67a658c5e9fc4b0e5f2d090db3d1a12d6f"},
+    {"path": "flowspeech_v1.py", "bytes": 25992, "sha256": "ef930ce515ad28c5efeb54b7fb07d4ec983131d2771c2c8a948bb93b95b903f6"},
+    {"path": "main.py", "bytes": 157, "sha256": "8c2ca9b73c1b3a1f88c2a7979b2f173ee62a98e0a08083f2d9eb9267eab6a07b"},
+    {"path": "manifest.yaml", "bytes": 827, "sha256": "0a79f9dac8eae09ae9c317008b95f763f60b4ba2fa9401b16723426b0766778e"},
+    {"path": "provider/__init__.py", "bytes": 1, "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"},
+    {"path": "provider/flowspeech.py", "bytes": 591, "sha256": "66b60b9e289ba45095b7b006d0470300e0be24051ac19d8352f2584904057e52"},
+    {"path": "provider/flowspeech.yaml", "bytes": 829, "sha256": "a74b9fc4c0a8063144f68f83d48539be553b95559e06211fa5bdba531da9246f"},
+    {"path": "requirements.txt", "bytes": 34, "sha256": "33b131d54972ea4340c57ac88d86d95837b160e039cec5ec1e9b350dc4d4474e"},
+    {"path": "runtime_config.py", "bytes": 876, "sha256": "f21482ec5efdc0c02d2d422f38c28d3fb869fa0c6e84990b872569312f399c04"},
+    {"path": "tools/__init__.py", "bytes": 1, "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"},
+    {"path": "tools/text_to_speech.py", "bytes": 1986, "sha256": "ef633e7970845c998e05aff681df9452c448fd97356a13f2941e1abf88a92cdb"},
+    {"path": "tools/text_to_speech.yaml", "bytes": 5706, "sha256": "6b64dbd531c489ec9896f9219978bcd555aa817cd6a8014779f3808fad339522"}
+  ]
+}

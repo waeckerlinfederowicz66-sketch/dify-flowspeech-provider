@@ -32,20 +32,19 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Download exact own-repo draft QA candidate by API ID
-        timeout-minutes: 3
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Independently build the exact reviewed candidate
+        timeout-minutes: 5
         run: |
           set -euo pipefail
-          python3 -m scripts.deployed_ce.download_qa_candidate
+          python3 -m scripts.deployed_ce.build_qa_candidate "$GATE_STATE-build"
       - name: Verify the coordinator-staged candidate and prepare disposable settings
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          python3 -m scripts.deployed_ce.stage_candidate "$GATE_STATE"
+          python3 -m scripts.deployed_ce.stage_candidate "$GATE_STATE" --source "$GATE_STATE-build/candidate.difypkg"
           python3 scripts/deployed_ce/prepare.py "$GATE_STATE"
           python3 scripts/verify_artifacts.py "$GATE_STATE/candidate.difypkg" > "$GATE_STATE/evidence/package-audit.json"
+          cp -- "$GATE_STATE-build/build-proof.json" "$GATE_STATE/evidence/build-proof.json"
       - name: Stage binary dependencies outside the isolated deployment
         timeout-minutes: 6
         run: |
