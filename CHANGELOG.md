@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.1 - 2026-10-27 (Candidate)
+## 0.2.1
 
 - Use fixed HTTP diagnostics and bounded safe code/trace tokens so upstream
   messages, reflected keys and private audio links do not enter Dify error output.
@@ -10,9 +10,6 @@
   abandoned workers from submitting requests, and defer owned-client cleanup.
 - Add offline source/artifact regressions for retry policy, recovery IDs,
   credential-free downloads, worker saturation and late submission prevention.
-- These changes are not in the previously submitted 0.2.0 package. The new
-  candidate requires its own final-artifact CE and remote-debug validation
-  before coordinator approval; publication has not occurred.
 
 ## 0.2.0 - 2026-10-26
 
@@ -30,6 +27,3 @@
 - Add fake-transport contract tests and distribution verification.
 - Preserve generator-based audio blob output; add multi-speaker JSON, request UUID and deadline controls.
 - Switch the internal client transport from requests to httpx; update storage egress declaration.
-
-The 0.2.0 release assets are prepared locally. Publication is a separate coordinator action.
-
