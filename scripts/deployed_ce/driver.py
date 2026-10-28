@@ -9,6 +9,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import time
 from urllib.error import HTTPError, URLError
@@ -140,6 +141,34 @@ def wait_for(check, seconds=300):
         time.sleep(3)
 
 
+def runtime_credential_rejected(status: int, message: str) -> bool:
+    # Retain only the two exact legacy fixture messages, not token substrings.
+    if status in {400, 401, 403} and message in {"INVALID_API_KEY", "PluginInvokeError: INVALID_API_KEY"}:
+        return True
+    prefix, separator, encoded = message.partition(" PluginInvokeError: ")
+    if status != 400 or not separator or not re.fullmatch(r"req_id: [0-9a-f]{10}", prefix):
+        return False
+
+    def unique_object(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("Duplicate error field")
+            value[key] = item
+        return value
+
+    def invalid_constant(_):
+        raise ValueError("Non-JSON constant")
+
+    try:
+        error = json.loads(encoded, object_pairs_hook=unique_object, parse_constant=invalid_constant)
+    except (ValueError, RecursionError):
+        return False
+    return (isinstance(error, dict)
+            and error.get("error_type") == "ToolProviderCredentialValidationError"
+            and error.get("message") == "FlowSpeech API returned HTTP 401")
+
+
 def wait_for_runtime(console: Console, seconds=90):
     """Require actual quota dispatch after restart, without creating audio or credentials."""
     console.current_case = "provider-runtime-readiness"
@@ -172,7 +201,7 @@ def wait_for_runtime(console: Console, seconds=90):
                     and "PluginDaemonInternalServerError" in message
                     and "no available node, plugin runtime not found" in message):
                 return False
-            if error.code not in {400, 401, 403} or "INVALID_API_KEY" not in message:
+            if not runtime_credential_rejected(error.code, message):
                 raise RuntimeError(f"Plugin runtime readiness rejected unexpectedly (HTTP {error.code})") from None
         else:
             raise AssertionError("CE accepted invalid credentials during runtime readiness")

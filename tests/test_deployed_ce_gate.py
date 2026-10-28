@@ -314,6 +314,20 @@ def test_short_host_requires_existing_saved_credentials_without_adding_again(mon
     assert console.events == ["login", "/tools", "/info"] + (["runtime-ready"] if saved else [])
 
 
+RUNTIME_ERROR_PREFIX = "req_id: 1ac2b2dacf PluginInvokeError: "
+
+
+def sanitized_runtime_error(**overrides):
+    error = {"args": {"traceback": "Synthetic provider fixture"},
+             "error_type": "ToolProviderCredentialValidationError",
+             "message": "FlowSpeech API returned HTTP 401"}
+    error.update(overrides)
+    return RUNTIME_ERROR_PREFIX + json.dumps(error)
+
+
+RUNTIME_REJECTIONS = ["INVALID_API_KEY", "PluginInvokeError: INVALID_API_KEY", sanitized_runtime_error()]
+
+
 def runtime_http_error(status, message):
     body = message if isinstance(message, bytes) else json.dumps({"message": message}).encode()
     return HTTPError(driver.BASE + "/console/api" + driver.PROVIDER_PATH + "/add", status,
@@ -342,10 +356,11 @@ class RuntimeProbeConsole:
         return self.audit
 
 
-def test_runtime_readiness_retries_only_startup_then_proves_quota_dispatch(monkeypatch):
+@pytest.mark.parametrize("rejection", RUNTIME_REJECTIONS)
+def test_runtime_readiness_retries_only_startup_then_proves_quota_dispatch(monkeypatch, rejection):
     missing = "req_id: fixture PluginDaemonInternalServerError: no available node, plugin runtime not found"
     console = RuntimeProbeConsole([runtime_http_error(400, missing), runtime_http_error(404, missing),
-                                   runtime_http_error(400, "PluginInvokeError: INVALID_API_KEY")])
+                                   runtime_http_error(400, rejection)])
     now = [0.0]
     monkeypatch.setattr(driver.time, "monotonic", lambda: now[0])
     monkeypatch.setattr(driver.time, "sleep", lambda delay: now.__setitem__(0, now[0] + delay))
@@ -390,8 +405,9 @@ def test_runtime_readiness_rejects_host_accepting_invalid_credentials():
     assert len(console.requests) == 1
 
 
-def test_runtime_readiness_cannot_pass_after_its_deadline(monkeypatch):
-    console = RuntimeProbeConsole([runtime_http_error(400, "INVALID_API_KEY")])
+@pytest.mark.parametrize("rejection", RUNTIME_REJECTIONS)
+def test_runtime_readiness_cannot_pass_after_its_deadline(monkeypatch, rejection):
+    console = RuntimeProbeConsole([runtime_http_error(400, rejection)])
     clock = iter([0.0, 0.0, 0.0, 91.0])
     monkeypatch.setattr(driver.time, "monotonic", lambda: next(clock))
     with pytest.raises(RuntimeError, match="readiness deadline exceeded"):
@@ -400,8 +416,9 @@ def test_runtime_readiness_cannot_pass_after_its_deadline(monkeypatch):
 
 
 @pytest.mark.parametrize("defect", ["no-quota", "job", "create", "wrong-host", "cookie", "no-auth"])
-def test_runtime_readiness_requires_observed_quota_only_probe(defect):
-    console = RuntimeProbeConsole([runtime_http_error(400, "INVALID_API_KEY")])
+@pytest.mark.parametrize("rejection", RUNTIME_REJECTIONS)
+def test_runtime_readiness_requires_observed_quota_only_probe(defect, rejection):
+    console = RuntimeProbeConsole([runtime_http_error(400, rejection)])
     if defect == "no-quota":
         console.audit["calls"] = []
     elif defect == "job":
@@ -416,6 +433,98 @@ def test_runtime_readiness_requires_observed_quota_only_probe(defect):
         console.audit["calls"][0]["authorization_present"] = False
     with pytest.raises(AssertionError, match="readiness"):
         driver.wait_for_runtime(console)
+
+
+def test_sanitized_runtime_rejection_requires_audit_without_retry(monkeypatch):
+    console = RuntimeProbeConsole([runtime_http_error(400, sanitized_runtime_error())])
+    monkeypatch.setattr(driver.time, "sleep", lambda _: pytest.fail("Expected credential rejection is not a startup retry"))
+    report = driver.wait_for_runtime(console)
+    assert report["attempts"] == 1 and report["invalid_rejected"] is True
+    assert report["quota_calls"] == 1 and report["creates"] == 0
+    assert console.current_audit is console.audit and len(console.requests) == 1
+
+
+@pytest.mark.parametrize("valid_save", [True, False])
+def test_remote_runtime_readiness_still_requires_subsequent_valid_save(tmp_path, monkeypatch, valid_save):
+    from scripts.remote_debug import driver as remote_driver
+
+    saved = {"result": "success"} if valid_save else runtime_http_error(400, "Valid credential save failed")
+    console = RuntimeProbeConsole([runtime_http_error(400, sanitized_runtime_error()), saved,
+                                   {}, [{"name": "flowspeech_text_to_speech"}]])
+    console.fixture = {"api_key": KEY}
+    console.login = lambda: None
+    console.last_app_id = REQUEST_ID
+    identity = "flowspeech/flowspeech:0.2.1@" + "a" * 64
+    monkeypatch.setattr(remote_driver, "entries", lambda _: [{"plugin_unique_identifier": identity}])
+    monkeypatch.setattr(driver.time, "sleep", lambda _: pytest.fail("Neither credential rejection may be retried"))
+    workflow_calls = []
+
+    def run_case(client, case, **kwargs):
+        assert client is console and case == "basic"
+        assert len(console.requests) == 4 and console.requests[1][1]["body"]["credentials"] == {"api_key": KEY}
+        workflow_calls.append(case)
+        return {"case": "basic", "status": "passed"}
+
+    monkeypatch.setattr(driver, "run_case", run_case)
+    if valid_save:
+        result = remote_driver.connected(console, tmp_path)
+        assert result["valid_credentials_saved"] is True and workflow_calls == ["basic"]
+        assert result["invalid_quota"]["invalid_rejected"] is True
+        assert [name for name, _ in console.requests] == [driver.PROVIDER_PATH + "/add",
+            driver.PROVIDER_PATH + "/add", driver.PROVIDER_PATH + "/info", driver.PROVIDER_PATH + "/tools"]
+    else:
+        with pytest.raises(HTTPError):
+            remote_driver.connected(console, tmp_path)
+        assert not workflow_calls and not (tmp_path / "dispatch.json").exists()
+        assert len(console.requests) == 2
+    assert console.requests[0][1]["body"]["credentials"] == {"api_key": "invalid-fixture-key"}
+    assert console.requests[1][1]["body"]["credentials"] == {"api_key": KEY}
+
+
+@pytest.mark.parametrize("status", [301, 302, 401, 403, 404, 408, 429, 500, 502, 503, 504])
+def test_sanitized_runtime_rejection_requires_exact_outer_http400(monkeypatch, status):
+    console = RuntimeProbeConsole([runtime_http_error(status, sanitized_runtime_error())])
+    monkeypatch.setattr(driver.time, "sleep", lambda _: pytest.fail("Non-startup errors must not be retried"))
+    with pytest.raises(RuntimeError, match="rejected unexpectedly"):
+        driver.wait_for_runtime(console)
+    assert len(console.requests) == 1 and not hasattr(console, "current_audit")
+
+
+@pytest.mark.parametrize("prefix", ["", "PluginInvokeError: ", "req_id: fixture PluginInvokeError: ",
+    "req_id: 1ac2b2dac PluginInvokeError: ", "req_id: 1ac2b2dacff PluginInvokeError: ",
+    "req_id: 1AC2B2DACF PluginInvokeError: ", "req_id: " + "a" * 65 + " PluginInvokeError: ",
+    "req_id: 1ac2b2dacf\nPluginInvokeError: ", " req_id: 1ac2b2dacf PluginInvokeError: ",
+    "req_id: 1ac2b2dacf extra PluginInvokeError: "])
+def test_sanitized_runtime_rejection_requires_bounded_exact_ce_prefix(monkeypatch, prefix):
+    message = prefix + sanitized_runtime_error().removeprefix(RUNTIME_ERROR_PREFIX)
+    console = RuntimeProbeConsole([runtime_http_error(400, message)])
+    monkeypatch.setattr(driver.time, "sleep", lambda _: pytest.fail("Malformed CE errors must not be retried"))
+    with pytest.raises(RuntimeError, match="rejected unexpectedly"):
+        driver.wait_for_runtime(console)
+    assert len(console.requests) == 1 and not hasattr(console, "current_audit")
+
+
+@pytest.mark.parametrize("message", [
+    "FlowSpeech API returned HTTP 401", "Unrelated INVALID_API_KEY failure",
+    sanitized_runtime_error(error_type="OtherError"), sanitized_runtime_error(error_type=None),
+    sanitized_runtime_error(error_type={"type": "ToolProviderCredentialValidationError"}),
+    sanitized_runtime_error(message="FlowSpeech API returned HTTP 403"),
+    sanitized_runtime_error(message="FlowSpeech API returned HTTP 401; certificate verification failed"),
+    sanitized_runtime_error(message={"nested": "FlowSpeech API returned HTTP 401"}),
+    sanitized_runtime_error(message="INVALID_API_KEY", error_type="UnrelatedError"),
+    RUNTIME_ERROR_PREFIX + "null", RUNTIME_ERROR_PREFIX + "[]", RUNTIME_ERROR_PREFIX + '"HTTP 401"',
+    RUNTIME_ERROR_PREFIX + "not-json", RUNTIME_ERROR_PREFIX + '{"error_type":"ToolProviderCredentialValidationError"}',
+    RUNTIME_ERROR_PREFIX + '{"message":"FlowSpeech API returned HTTP 401"}',
+    sanitized_runtime_error() + " trailing", sanitized_runtime_error() + "{}",
+    RUNTIME_ERROR_PREFIX + '{"error_type":"OtherError","error_type":"ToolProviderCredentialValidationError","message":"FlowSpeech API returned HTTP 401"}',
+    RUNTIME_ERROR_PREFIX + '{"error_type":"ToolProviderCredentialValidationError","message":"FlowSpeech API returned HTTP 401","args":NaN}',
+])
+def test_sanitized_runtime_rejection_rejects_malformed_or_unrelated_envelopes(monkeypatch, message):
+    console = RuntimeProbeConsole([runtime_http_error(400, message)])
+    monkeypatch.setattr(driver.time, "sleep", lambda _: pytest.fail("Malformed/unrelated errors must not be retried"))
+    with pytest.raises(RuntimeError, match="rejected unexpectedly"):
+        driver.wait_for_runtime(console)
+    assert len(console.requests) == 1 and not hasattr(console, "current_audit")
 
 
 @pytest.mark.parametrize("status", [301, 302, 400, 401, 403, 404, 422])
